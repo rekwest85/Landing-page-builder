@@ -488,17 +488,31 @@ function ColumnsBlock({ block }: { block: Block }) {
     3: "md:grid-cols-3",
     4: "md:grid-cols-4",
   }[cols as 2 | 3 | 4];
+  // Columns live at block.children (Block[][]), NOT in props
+  const columns = (block.children as Block[][]) ?? [];
   return (
     <div style={styleToCss(block.style)}>
       <div className={cn("max-w-6xl mx-auto grid gap-6", colClass)}>
-        {(p.children as Block[][])?.map((column, i) => (
-          <div key={i} className="space-y-4">
-            {column?.map((child) => (
-              <BlockRenderer key={child.id} block={child} />
-            ))}
+        {columns.map((column, i) => (
+          <div key={i} className="space-y-4 min-h-[80px]">
+            {column?.length ? (
+              column.map((child) => (
+                <BlockRenderer key={child.id} block={child} />
+              ))
+            ) : (
+              <EmptyColumn />
+            )}
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+function EmptyColumn() {
+  return (
+    <div className="flex items-center justify-center h-20 rounded-xl border border-dashed border-white/[0.08] text-xs text-white/30">
+      Drop blocks here
     </div>
   );
 }
