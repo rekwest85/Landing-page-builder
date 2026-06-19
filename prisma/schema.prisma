@@ -1,0 +1,134 @@
+// Forge — landing page builder schema
+// Postgres on Neon
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ── Auth (simple for MVP, swap for Clerk later) ──────────────────────────────
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  avatarUrl String?
+  createdAt DateTime @default(now())
+
+  workspaces WorkspaceMember[]
+  pages      Page[]
+}
+
+model Workspace {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique // used for default subdomain: slug.forge.so
+  createdAt DateTime @default(now())
+
+  members  WorkspaceMember[]
+  pages    Page[]
+  domains  CustomDomain[]
+}
+
+enum WorkspaceRole {
+  OWNER
+  EDITOR
+  VIEWER
+}
+
+model WorkspaceMember {
+  id          String        @id @default(cuid())
+  workspaceId String
+  userId      String
+  role        WorkspaceRole @default(EDITOR)
+  createdAt   DateTime      @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, userId])
+}
+
+model CustomDomain {
+  id          String   @id @default(cuid())
+  workspaceId String
+  domain      String   @unique // e.g. "pages.acme.com"
+  verified    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}
+
+// ── Pages ────────────────────────────────────────────────────────────────────
+
+enum PageStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+model Page {
+  id          String     @id @default(cuid())
+  slug        String // unique within workspace
+  title       String
+  description String?
+  ogImage     String?
+
+  // The block tree (the heart of the system)
+  tree      Json // Block[] — see src/lib/blocks/types.ts
+
+  status      PageStatus @default(DRAFT)
+  publishedAt DateTime?
+
+  workspaceId String
+  authorId    String
+
+  // Optional metadata for the published page
+  faviconUrl String?
+  customCss  String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  workspace Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  author    User          @relation(fields: [authorId], references: [id])
+  versions  PageVersion[]
+  events    PageEvent[]
+
+  @@unique([workspaceId, slug])
+  @@index([status])
+  @@index([workspaceId])
+}
+
+// Historical snapshots for version history / "undo"
+model PageVersion {
+  id        String   @id @default(cuid())
+  pageId    String
+  tree      Json
+  createdAt DateTime @default(now())
+
+  page Page @relation(fields: [pageId], references: [id], onDelete: Cascade)
+
+  @@index([pageId])
+}
+
+// ── Analytics (lightweight, for the AI auto-optimize loop later) ──────────────
+
+model PageEvent {
+  id        String   @id @default(cuid())
+  pageId    String
+  blockId   String?
+  sessionId String
+  event     String // view, click, submit, scroll, abandon
+  data      Json?
+  ts        DateTime @default(now())
+
+  page Page @relation(fields: [pageId], references: [id], onDelete: Cascade)
+
+  @@index([pageId, event])
+  @@index([ts])
+}
