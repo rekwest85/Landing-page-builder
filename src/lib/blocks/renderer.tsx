@@ -1409,7 +1409,729 @@ function GlowCTABlock({ block }: { block: Block }) {
   );
 }
 
-// ── Registry ─────────────────────────────────────────────────────────────────
+// ── Effects: background visuals ─────────────────────────────────────────────
+
+function ParticleFieldBlock({ block }: { block: Block }) {
+  const canvasRef = React.useRef<HTMLCanvasElement>(null);
+  const p = block.props;
+  const interactive = p.interactive !== false;
+  const density = p.density ?? "medium";
+  const count =
+    p.particleCount ??
+    (density === "low" ? 30 : density === "high" ? 100 : 60);
+
+  React.useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    let raf = 0;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const mouse = { x: -9999, y: -9999 };
+
+    const resize = () => {
+      const rect = canvas.getBoundingClientRect();
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
+      ctx.scale(dpr, dpr);
+    };
+    resize();
+
+    type P = { x: number; y: number; vx: number; vy: number; r: number };
+    const particles: P[] = Array.from({ length: count }, () => ({
+      x: Math.random() * canvas.width / dpr,
+      y: Math.random() * canvas.height / dpr,
+      vx: (Math.random() - 0.5) * 0.4,
+      vy: (Math.random() - 0.5) * 0.4,
+      r: Math.random() * 1.8 + 0.6,
+    }));
+
+    const onMouse = (e: MouseEvent) => {
+      const rect = canvas.getBoundingClientRect();
+      mouse.x = e.clientX - rect.left;
+      mouse.y = e.clientY - rect.top;
+    };
+    const onLeave = () => {
+      mouse.x = -9999;
+      mouse.y = -9999;
+    };
+
+    if (interactive) {
+      canvas.addEventListener("mousemove", onMouse);
+      canvas.addEventListener("mouseleave", onLeave);
+    }
+    window.addEventListener("resize", resize);
+
+    const tick = () => {
+      const w = canvas.width / dpr;
+      const h = canvas.height / dpr;
+      ctx.clearRect(0, 0, w, h);
+
+      for (const pt of particles) {
+        pt.x += pt.vx;
+        pt.y += pt.vy;
+        if (pt.x < 0 || pt.x > w) pt.vx *= -1;
+        if (pt.y < 0 || pt.y > h) pt.vy *= -1;
+
+        if (interactive) {
+          const dx = pt.x - mouse.x;
+          const dy = pt.y - mouse.y;
+          const dist = Math.hypot(dx, dy);
+          if (dist < 100) {
+            const force = (100 - dist) / 100;
+            pt.x += (dx / dist) * force * 2;
+            pt.y += (dy / dist) * force * 2;
+          }
+        }
+      }
+
+      // Connections
+      for (let i = 0; i < particles.length; i++) {
+        for (let j = i + 1; j < particles.length; j++) {
+          const a = particles[i];
+          const b = particles[j];
+          const dist = Math.hypot(a.x - b.x, a.y - b.y);
+          if (dist < 110) {
+            ctx.strokeStyle = `${p.color}${Math.floor(((1 - dist / 110) * 60)).toString(16).padStart(2, "0")}`;
+            ctx.lineWidth = 0.6;
+            ctx.beginPath();
+            ctx.moveTo(a.x, a.y);
+            ctx.lineTo(b.x, b.y);
+            ctx.stroke();
+          }
+        }
+      }
+
+      // Particles
+      ctx.fillStyle = p.color;
+      for (const pt of particles) {
+        ctx.beginPath();
+        ctx.arc(pt.x, pt.y, pt.r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("resize", resize);
+      canvas.removeEventListener("mousemove", onMouse);
+      canvas.removeEventListener("mouseleave", onLeave);
+    };
+  }, [count, p.color, interactive]);
+
+  return (
+    <div style={styleToCss(block.style)} className="relative overflow-hidden">
+      <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" />
+      <div className="relative">{/* content slot */}</div>
+    </div>
+  );
+}
+
+function AuroraBackgroundBlock({ block }: { block: Block }) {
+  const p = block.props;
+  const colors = p.colors ?? ["#8b5cf6", "#6366f1", "#ec4899"];
+  const speed = p.speed ?? 18;
+  return (
+    <div
+      style={{
+        ...styleToCss(block.style),
+        position: "relative",
+        overflow: "hidden",
+      }}
+    >
+      <div
+        aria-hidden
+        className="absolute inset-0"
+        style={{
+          background: `radial-gradient(at 20% 20%, ${colors[0]}55 0px, transparent 50%),
+                       radial-gradient(at 80% 0%, ${colors[1] ?? colors[0]}55 0px, transparent 50%),
+                       radial-gradient(at 50% 80%, ${colors[2] ?? colors[0]}55 0px, transparent 50%)`,
+          filter: "blur(80px)",
+          animation: `aurora-drift ${speed}s ease-in-out infinite`,
+        }}
+      />
+      <div className="relative" />
+    </div>
+  );
+}
+
+function AnimatedMeshBlock({ block }: { block: Block }) {
+  const p = block.props;
+  const colors = p.colors ?? ["#8b5cf6", "#ec4899", "#06b6d4", "#10b981"];
+  const speed = p.speed ?? 20;
+  return (
+    <div
+      style={{
+        ...styleToCss(block.style),
+        position: "relative",
+        overflow: "hidden",
+      }}
+    >
+      <div aria-hidden className="absolute inset-0" style={{ filter: "blur(100px)", opacity: 0.7 }}>
+        {colors.slice(0, 4).map((c: string, i: number) => (
+          <div
+            key={i}
+            style={{
+              position: "absolute",
+              width: "60%",
+              height: "60%",
+              borderRadius: "50%",
+              background: c,
+              top: `${20 + (i % 2) * 30}%`,
+              left: `${(i * 25) % 80}%`,
+              animation: `mesh-blob-${i % 4} ${speed}s ease-in-out infinite`,
+              mixBlendMode: "screen",
+            }}
+          />
+        ))}
+      </div>
+      <div className="relative" />
+    </div>
+  );
+}
+
+function FloatingOrbsBlock({ block }: { block: Block }) {
+  const p = block.props;
+  const colors = p.colors ?? ["#8b5cf6", "#ec4899", "#06b6d4"];
+  const count = Math.min(p.count ?? 4, 8);
+  return (
+    <div
+      style={{
+        ...styleToCss(block.style),
+        position: "relative",
+        overflow: "hidden",
+      }}
+    >
+      <div aria-hidden className="absolute inset-0" style={{ filter: "blur(70px)", opacity: 0.55 }}>
+        {Array.from({ length: count }).map((_, i) => (
+          <div
+            key={i}
+            style={{
+              position: "absolute",
+              width: `${180 + (i % 3) * 60}px`,
+              height: `${180 + (i % 3) * 60}px`,
+              borderRadius: "50%",
+              background: colors[i % colors.length],
+              top: `${10 + ((i * 23) % 70)}%`,
+              left: `${(i * 31) % 80}%`,
+              animation: `orb-float-${i % 4} ${12 + (i % 3) * 4}s ease-in-out infinite`,
+              animationDelay: `${i * 0.7}s`,
+            }}
+          />
+        ))}
+      </div>
+      <div className="relative" />
+    </div>
+  );
+}
+
+function MatrixRainBlock({ block }: { block: Block }) {
+  const canvasRef = React.useRef<HTMLCanvasElement>(null);
+  const p = block.props;
+  const fontSize = p.fontSize ?? 16;
+  const color = p.color ?? "#00ff88";
+  const speedMul = p.speed ?? 1;
+
+  React.useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const chars = "アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン0123456789";
+    let raf = 0;
+    let drops: number[] = [];
+
+    const resize = () => {
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const rect = canvas.getBoundingClientRect();
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
+      ctx.scale(dpr, dpr);
+      const cols = Math.floor(rect.width / fontSize);
+      drops = Array.from({ length: cols }, () => Math.random() * -100);
+    };
+    resize();
+
+    const tick = () => {
+      const w = canvas.width / Math.min(window.devicePixelRatio || 1, 2);
+      const h = canvas.height / Math.min(window.devicePixelRatio || 1, 2);
+      ctx.fillStyle = "rgba(0, 0, 0, 0.06)";
+      ctx.fillRect(0, 0, w, h);
+      ctx.fillStyle = color;
+      ctx.font = `${fontSize}px monospace`;
+
+      for (let i = 0; i < drops.length; i++) {
+        const ch = chars[Math.floor(Math.random() * chars.length)];
+        ctx.fillText(ch, i * fontSize, drops[i] * fontSize);
+        if (drops[i] * fontSize > h && Math.random() > 0.975) drops[i] = 0;
+        drops[i] += speedMul;
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    window.addEventListener("resize", resize);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("resize", resize);
+    };
+  }, [fontSize, color, speedMul]);
+
+  return (
+    <div
+      style={{
+        ...styleToCss(block.style),
+        position: "relative",
+        overflow: "hidden",
+      }}
+    >
+      <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" />
+      <div className="relative" />
+    </div>
+  );
+}
+
+// ── Effects: text ───────────────────────────────────────────────────────────
+
+function GlitchTextBlock({ block }: { block: Block }) {
+  const p = block.props;
+  const continuous = p.continuous ?? true;
+  const [active, setActive] = React.useState(false);
+  const on = continuous || active;
+  return (
+    <div
+      style={styleToCss(block.style)}
+      onMouseEnter={() => setActive(true)}
+      onMouseLeave={() => setActive(false)}
+      className="relative select-none"
+    >
+      <div className="relative inline-block">
+        <span
+          aria-hidden
+          className="absolute inset-0"
+          style={{
+            color: p.glitchColor1 ?? "#ec4899",
+            transform: on ? "translate(-2px, 0)" : "translate(0, 0)",
+            animation: on ? "glitch-x 2.6s steps(2, end) infinite" : undefined,
+            clipPath: on ? "polygon(0 0, 100% 0, 100% 45%, 0 45%)" : undefined,
+            mixBlendMode: "screen",
+          }}
+        >
+          {p.text}
+        </span>
+        <span
+          aria-hidden
+          className="absolute inset-0"
+          style={{
+            color: p.glitchColor2 ?? "#06b6d4",
+            transform: on ? "translate(2px, 0)" : "translate(0, 0)",
+            animation: on ? "glitch-y 3.1s steps(2, end) infinite" : undefined,
+            clipPath: on ? "polygon(0 55%, 100% 55%, 100% 100%, 0 100%)" : undefined,
+            mixBlendMode: "screen",
+          }}
+        >
+          {p.text}
+        </span>
+        <span
+          className="relative font-bold tracking-tight"
+          style={{
+            color: p.color ?? "#ffffff",
+            fontSize: "clamp(2.5rem, 7vw, 5rem)",
+            lineHeight: 1.1,
+          }}
+        >
+          {p.text}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function TypewriterTextBlock({ block }: { block: Block }) {
+  const p = block.props;
+  const [shown, setShown] = React.useState(0);
+  const [done, setDone] = React.useState(false);
+  const text = p.text ?? "";
+  const speed = p.speed ?? 60;
+  const caret = p.caret ?? true;
+
+  React.useEffect(() => {
+    setShown(0);
+    setDone(false);
+  }, [text]);
+
+  React.useEffect(() => {
+    if (done && !p.loop) return;
+    if (shown >= text.length) {
+      if (p.loop) {
+        const t = setTimeout(() => {
+          setShown(0);
+          setDone(false);
+        }, 1500);
+        return () => clearTimeout(t);
+      }
+      return;
+    }
+    const t = setTimeout(() => setShown((s) => s + 1), speed);
+    return () => clearTimeout(t);
+  }, [shown, text, speed, p.loop, done]);
+
+  return (
+    <div style={styleToCss(block.style)} className="font-semibold">
+      <span className="text-2xl md:text-4xl tracking-tight text-white">
+        {text.slice(0, shown)}
+        {caret && (
+          <span
+            className="inline-block w-[2px] h-[1em] align-middle ml-1 bg-current"
+            style={{ animation: "caret-blink 1s steps(2) infinite" }}
+          />
+        )}
+      </span>
+    </div>
+  );
+}
+
+function GradientTextBlock({ block }: { block: Block }) {
+  const p = block.props;
+  const colors = p.colors ?? ["#8b5cf6", "#ec4899", "#06b6d4"];
+  const speed = p.speed ?? 4;
+  const animate = p.animate !== false;
+  const gradient = `linear-gradient(90deg, ${colors.join(", ")})`;
+  return (
+    <div style={styleToCss(block.style)}>
+      <span
+        className="font-bold tracking-tight"
+        style={{
+          backgroundImage: gradient,
+          backgroundSize: animate ? "300% 100%" : "100% 100%",
+          WebkitBackgroundClip: "text",
+          backgroundClip: "text",
+          color: "transparent",
+          fontSize: "clamp(2rem, 5vw, 3.5rem)",
+          lineHeight: 1.2,
+          animation: animate ? `gradient-pan ${speed}s ease-in-out infinite` : undefined,
+        }}
+      >
+        {p.text}
+      </span>
+    </div>
+  );
+}
+
+function MarqueeBlock({ block }: { block: Block }) {
+  const p = block.props;
+  const items = p.items ?? [];
+  const speed = p.speed ?? 30;
+  const sep = p.separator ?? "•";
+  const pause = p.pauseOnHover ?? true;
+  const reverse = p.reverse ?? false;
+  const track = [...items, ...items]; // duplicate for seamless loop
+  return (
+    <div
+      style={styleToCss(block.style)}
+      className="overflow-hidden relative"
+      onMouseEnter={(e) => {
+        if (!pause) return;
+        const t = e.currentTarget.querySelector("[data-marquee-track]") as HTMLElement | null;
+        if (t) t.style.animationPlayState = "paused";
+      }}
+      onMouseLeave={(e) => {
+        if (!pause) return;
+        const t = e.currentTarget.querySelector("[data-marquee-track]") as HTMLElement | null;
+        if (t) t.style.animationPlayState = "running";
+      }}
+    >
+      <div
+        data-marquee-track
+        className="flex gap-8 whitespace-nowrap"
+        style={{
+          width: "max-content",
+          animation: `marquee-${reverse ? "reverse" : "forward"} ${speed}s linear infinite`,
+        }}
+      >
+        {track.map((it: string, i: number) => (
+          <span key={i} className="text-2xl md:text-3xl font-medium text-white/70 flex items-center gap-8">
+            {it}
+            <span className="text-white/20">{sep}</span>
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Effects: scroll ─────────────────────────────────────────────────────────
+
+function ParallaxLayerBlock({ block }: { block: Block }) {
+  const ref = React.useRef<HTMLDivElement>(null);
+  const p = block.props;
+  const speed = p.speed ?? 0.5;
+  const direction = p.direction ?? "up";
+  const offset = React.useRef(0);
+
+  React.useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    let raf = 0;
+    const onScroll = () => {
+      const rect = el.getBoundingClientRect();
+      const winH = window.innerHeight;
+      const progress = (winH - rect.top) / (winH + rect.height);
+      const clamped = Math.max(0, Math.min(1, progress));
+      const range = (direction === "up" ? -1 : 1) * speed * 120;
+      offset.current = (clamped - 0.5) * range;
+      el.style.setProperty("--parallax-y", `${offset.current}px`);
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        el.style.transform = `translate3d(0, var(--parallax-y), 0)`;
+      });
+    };
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      cancelAnimationFrame(raf);
+    };
+  }, [speed, direction]);
+
+  return (
+    <div ref={ref} style={{ ...styleToCss(block.style), willChange: "transform" }}>
+      {block.children?.map((c) => <BlockRenderer key={c.id} block={c} />)}
+    </div>
+  );
+}
+
+function RevealOnScrollBlock({ block }: { block: Block }) {
+  const ref = React.useRef<HTMLDivElement>(null);
+  const [visible, setVisible] = React.useState(false);
+  const p = block.props;
+  const effect = p.effect ?? "slide-up";
+  const delay = p.delay ?? 0;
+  const duration = p.duration ?? 800;
+  const threshold = p.threshold ?? 0.2;
+  const once = p.once !== false;
+
+  React.useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          if (e.isIntersecting) {
+            setVisible(true);
+            if (once) obs.disconnect();
+          } else if (!once) {
+            setVisible(false);
+          }
+        }
+      },
+      { threshold }
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [threshold, once]);
+
+  const transforms: Record<string, string> = {
+    fade: "none",
+    "slide-up": "translateY(40px)",
+    "slide-left": "translateX(-40px)",
+    "slide-right": "translateX(40px)",
+    zoom: "scale(0.92)",
+  };
+  return (
+    <div
+      ref={ref}
+      style={{
+        ...styleToCss(block.style),
+        opacity: visible ? 1 : 0,
+        transform: visible ? "none" : transforms[effect],
+        transition: `opacity ${duration}ms ease-out, transform ${duration}ms ease-out`,
+        transitionDelay: `${delay}ms`,
+      }}
+    >
+      {block.children?.map((c) => <BlockRenderer key={c.id} block={c} />)}
+    </div>
+  );
+}
+
+function ScrollProgressBlock({ block }: { block: Block }) {
+  const ref = React.useRef<HTMLDivElement>(null);
+  const p = block.props;
+  const position = p.position ?? "top";
+  const color = p.color ?? "#8b5cf6";
+  const height = p.height ?? 3;
+
+  React.useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const onScroll = () => {
+      const max = document.documentElement.scrollHeight - window.innerHeight;
+      const pct = Math.max(0, Math.min(1, window.scrollY / max));
+      el.style.transform = `scaleX(${pct})`;
+    };
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  return (
+    <div
+      ref={ref}
+      style={{
+        position: "fixed",
+        left: 0,
+        right: 0,
+        top: position === "top" ? 0 : undefined,
+        bottom: position === "bottom" ? 0 : undefined,
+        height,
+        background: color,
+        transformOrigin: "left center",
+        transform: "scaleX(0)",
+        zIndex: 50,
+        transition: "transform 0.05s linear",
+        pointerEvents: "none",
+      }}
+    />
+  );
+}
+
+// ── Effects: interactive ────────────────────────────────────────────────────
+
+function TiltCardBlock({ block }: { block: Block }) {
+  const ref = React.useRef<HTMLDivElement>(null);
+  const p = block.props;
+  const maxTilt = p.maxTilt ?? 15;
+  const scale = p.scale ?? 1.03;
+  const glare = p.glare !== false;
+
+  const onMove = (e: React.MouseEvent) => {
+    const el = ref.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const px = (e.clientX - rect.left) / rect.width - 0.5;
+    const py = (e.clientY - rect.top) / rect.height - 0.5;
+    el.style.transform = `perspective(900px) rotateX(${-py * maxTilt}deg) rotateY(${px * maxTilt}deg) scale(${scale})`;
+    const glareEl = el.querySelector("[data-glare]") as HTMLElement | null;
+    if (glareEl) {
+      glareEl.style.background = `radial-gradient(circle at ${(px + 0.5) * 100}% ${(py + 0.5) * 100}%, rgba(255,255,255,0.18), transparent 60%)`;
+    }
+  };
+  const onLeave = () => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.transform = "perspective(900px) rotateX(0) rotateY(0) scale(1)";
+    el.style.transition = "transform 0.4s ease-out";
+    setTimeout(() => { if (el) el.style.transition = ""; }, 400);
+  };
+
+  return (
+    <div style={styleToCss(block.style)}>
+      <div
+        ref={ref}
+        onMouseMove={onMove}
+        onMouseLeave={onLeave}
+        className="relative rounded-2xl overflow-hidden"
+        style={{
+          background: "linear-gradient(135deg, #1a1a25 0%, #0d0d14 100%)",
+          border: "1px solid rgba(255,255,255,0.08)",
+          padding: "32px",
+          transformStyle: "preserve-3d",
+          transition: "transform 0.1s ease-out",
+        }}
+      >
+        {glare && (
+          <div
+            data-glare
+            className="absolute inset-0 pointer-events-none"
+            style={{ mixBlendMode: "screen" }}
+          />
+        )}
+        <div className="relative">
+          {block.children?.map((c) => <BlockRenderer key={c.id} block={c} />)}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MagneticButtonBlock({ block }: { block: Block }) {
+  const ref = React.useRef<HTMLAnchorElement>(null);
+  const p = block.props;
+  const strength = p.strength ?? 0.4;
+
+  const onMove = (e: React.MouseEvent) => {
+    const el = ref.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const dx = e.clientX - (rect.left + rect.width / 2);
+    const dy = e.clientY - (rect.top + rect.height / 2);
+    el.style.transform = `translate(${dx * strength}px, ${dy * strength}px)`;
+  };
+  const onLeave = () => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.transform = "translate(0, 0)";
+    el.style.transition = "transform 0.4s cubic-bezier(0.2, 0.9, 0.3, 1)";
+    setTimeout(() => { if (el) el.style.transition = "transform 0.15s ease-out"; }, 400);
+  };
+
+  const isPrimary = p.variant !== "ghost";
+  return (
+    <div style={styleToCss(block.style)}>
+      <a
+        ref={ref}
+        href={p.href ?? "#"}
+        onMouseMove={onMove}
+        onMouseLeave={onLeave}
+        className={
+          isPrimary
+            ? "inline-flex items-center gap-2 rounded-full bg-gradient-to-b from-violet-500 to-indigo-600 px-7 py-3.5 text-sm font-semibold text-white shadow-[0_0_40px_-4px_rgba(139,92,246,0.6)] transition-transform"
+            : "inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] text-white px-6 py-3 text-sm font-medium transition-transform"
+        }
+      >
+        {p.label}
+      </a>
+    </div>
+  );
+}
+
+// ── Effects: dividers ───────────────────────────────────────────────────────
+
+function WaveDividerBlock({ block }: { block: Block }) {
+  const p = block.props;
+  const color = p.color ?? "#ffffff";
+  const height = p.height ?? 80;
+  const variant = p.variant ?? "wave1";
+  const flip = p.flip ?? false;
+
+  const paths: Record<string, string> = {
+    wave1: "M0,32 C240,80 480,0 720,32 C960,64 1200,16 1440,48 L1440,80 L0,80 Z",
+    wave2: "M0,40 C320,80 640,0 960,40 C1120,60 1280,20 1440,40 L1440,80 L0,80 Z",
+    wave3: "M0,48 C160,16 320,80 480,48 C640,16 800,80 960,48 C1120,16 1280,80 1440,48 L1440,80 L0,80 Z",
+    curve: "M0,80 C480,0 960,0 1440,80 L1440,80 L0,80 Z",
+  };
+
+  return (
+    <div
+      style={{
+        ...styleToCss(block.style),
+        transform: flip ? "scaleY(-1)" : undefined,
+        marginTop: "-1px",
+      }}
+    >
+      <svg
+        viewBox="0 0 1440 80"
+        preserveAspectRatio="none"
+        style={{ display: "block", width: "100%", height }}
+      >
+        <path d={paths[variant]} fill={color} />
+      </svg>
+    </div>
+  );
+}
 
 const REGISTRY: Record<string, React.FC<{ block: Block }>> = {
   hero: HeroBlock,
@@ -1439,6 +2161,31 @@ const REGISTRY: Record<string, React.FC<{ block: Block }>> = {
   beforeAfter: BeforeAfterBlock,
   gradientCard: GradientCardBlock,
   glowCta: GlowCTABlock,
+
+  // ── Effects: backgrounds ─────────────────────────────────────────────────
+  particleField: ParticleFieldBlock,
+  auroraBackground: AuroraBackgroundBlock,
+  animatedMesh: AnimatedMeshBlock,
+  floatingOrbs: FloatingOrbsBlock,
+  matrixRain: MatrixRainBlock,
+
+  // ── Effects: text ────────────────────────────────────────────────────────
+  glitchText: GlitchTextBlock,
+  typewriterText: TypewriterTextBlock,
+  gradientText: GradientTextBlock,
+  marquee: MarqueeBlock,
+
+  // ── Effects: scroll ──────────────────────────────────────────────────────
+  parallaxLayer: ParallaxLayerBlock,
+  revealOnScroll: RevealOnScrollBlock,
+  scrollProgress: ScrollProgressBlock,
+
+  // ── Effects: interactive ─────────────────────────────────────────────────
+  tiltCard: TiltCardBlock,
+  magneticButton: MagneticButtonBlock,
+
+  // ── Effects: dividers ────────────────────────────────────────────────────
+  waveDivider: WaveDividerBlock,
 };
 
 export function BlockRenderer({ block }: { block: Block }) {

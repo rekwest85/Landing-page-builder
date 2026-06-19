@@ -33,7 +33,27 @@ export type BlockType =
   | "comparisonTable"
   | "beforeAfter"
   | "stats"
-  | "countdown";
+  | "countdown"
+  // Effects (backgrounds / visuals)
+  | "particleField"
+  | "auroraBackground"
+  | "animatedMesh"
+  | "floatingOrbs"
+  | "matrixRain"
+  // Effects (text)
+  | "glitchText"
+  | "typewriterText"
+  | "gradientText"
+  | "marquee"
+  // Effects (scroll)
+  | "parallaxLayer"
+  | "revealOnScroll"
+  | "scrollProgress"
+  // Effects (interactive)
+  | "tiltCard"
+  | "magneticButton"
+  // Effects (dividers)
+  | "waveDivider";
 
 export interface BlockStyle {
   padding?: string; // e.g. "80px 0"
@@ -233,6 +253,116 @@ export interface GlowCTAProps {
   ctaHref: string;
   secondaryLabel?: string;
   secondaryHref?: string;
+}
+
+// ── Effects: background visuals ──────────────────────────────────────────────
+
+export interface ParticleFieldProps {
+  particleCount?: number;     // default 60
+  color?: string;             // default #8b5cf6
+  interactive?: boolean;      // mouse repulsion, default true
+  density?: "low" | "medium" | "high";
+}
+
+export interface AuroraBackgroundProps {
+  colors?: string[];          // default violet/indigo/fuchsia
+  speed?: number;             // seconds, default 18
+}
+
+export interface AnimatedMeshProps {
+  colors?: string[];          // default 3-4 vibrant
+  speed?: number;             // seconds, default 20
+}
+
+export interface FloatingOrbsProps {
+  count?: number;             // default 4
+  colors?: string[];
+}
+
+export interface MatrixRainProps {
+  fontSize?: number;          // default 16
+  color?: string;             // default #00ff88
+  speed?: number;             // default 1
+}
+
+// ── Effects: text ───────────────────────────────────────────────────────────
+
+export interface GlitchTextProps {
+  text: string;
+  color?: string;             // base color, default #ffffff
+  glitchColor1?: string;       // default #ec4899 (magenta)
+  glitchColor2?: string;       // default #06b6d4 (cyan)
+  continuous?: boolean;       // loop vs hover-only
+}
+
+export interface TypewriterTextProps {
+  text: string;
+  speed?: number;             // ms per char, default 60
+  loop?: boolean;
+  caret?: boolean;            // show blinking caret, default true
+}
+
+export interface GradientTextProps {
+  text: string;
+  colors?: string[];          // default violet → fuchsia → indigo
+  speed?: number;             // seconds, default 4
+  animate?: boolean;          // default true
+}
+
+export interface MarqueeProps {
+  items: string[];
+  speed?: number;             // seconds for full pass, default 30
+  separator?: string;         // default "•"
+  pauseOnHover?: boolean;
+  reverse?: boolean;
+}
+
+// ── Effects: scroll ─────────────────────────────────────────────────────────
+
+export interface ParallaxLayerProps {
+  speed?: number;             // -1 (slow) to 1 (fast), default 0.5
+  direction?: "up" | "down";
+  children: Block[];
+}
+
+export interface RevealOnScrollProps {
+  effect?: "fade" | "slide-up" | "slide-left" | "slide-right" | "zoom";
+  delay?: number;             // ms
+  duration?: number;          // ms, default 800
+  threshold?: number;         // 0-1, default 0.2
+  once?: boolean;             // default true
+  children: Block[];
+}
+
+export interface ScrollProgressProps {
+  position?: "top" | "bottom";
+  color?: string;             // default #8b5cf6
+  height?: number;            // px, default 3
+}
+
+// ── Effects: interactive ────────────────────────────────────────────────────
+
+export interface TiltCardProps {
+  maxTilt?: number;           // degrees, default 15
+  scale?: number;             // hover scale, default 1.03
+  glare?: boolean;            // show glare, default true
+  children: Block[];
+}
+
+export interface MagneticButtonProps {
+  label: string;
+  href?: string;
+  strength?: number;          // 0-1, default 0.4
+  variant?: "primary" | "ghost";
+}
+
+// ── Effects: dividers ───────────────────────────────────────────────────────
+
+export interface WaveDividerProps {
+  color?: string;             // fill color, default #ffffff
+  height?: number;            // px, default 80
+  variant?: "wave1" | "wave2" | "wave3" | "curve";
+  flip?: boolean;             // mirror vertically
 }
 
 // ── Block registry — single source of truth for the editor + renderer ────────
@@ -711,6 +841,206 @@ export const BLOCK_DEFINITIONS: Record<BlockType, BlockDefinition> = {
       padding: "120px 24px",
       background: "#0a0a0f",
     },
+  },
+
+  // ── Effects: backgrounds ───────────────────────────────────────────────
+  particleField: {
+    type: "particleField",
+    label: "Particle Field",
+    category: "content",
+    icon: "Sparkles",
+    description: "Canvas particles with mouse interaction (hero backdrop)",
+    defaultProps: {
+      particleCount: 60,
+      color: "#8b5cf6",
+      interactive: true,
+      density: "medium",
+    },
+    defaultStyle: { padding: "0", background: "#0a0a0f" },
+  },
+  auroraBackground: {
+    type: "auroraBackground",
+    label: "Aurora Background",
+    category: "content",
+    icon: "Sparkles",
+    description: "Northern-lights animated mesh (hero backdrop)",
+    defaultProps: {
+      colors: ["#8b5cf6", "#6366f1", "#ec4899"],
+      speed: 18,
+    },
+    defaultStyle: { padding: "120px 24px", background: "#050510" },
+  },
+  animatedMesh: {
+    type: "animatedMesh",
+    label: "Animated Mesh",
+    category: "content",
+    icon: "Sparkles",
+    description: "Morphing colored gradient blobs (hero backdrop)",
+    defaultProps: {
+      colors: ["#8b5cf6", "#ec4899", "#06b6d4", "#10b981"],
+      speed: 20,
+    },
+    defaultStyle: { padding: "120px 24px", background: "#0a0a0f" },
+  },
+  floatingOrbs: {
+    type: "floatingOrbs",
+    label: "Floating Orbs",
+    category: "content",
+    icon: "Sparkles",
+    description: "Floating gradient orbs with blur (hero backdrop)",
+    defaultProps: {
+      count: 4,
+      colors: ["#8b5cf6", "#ec4899", "#06b6d4"],
+    },
+    defaultStyle: { padding: "100px 24px", background: "#0a0a0f" },
+  },
+  matrixRain: {
+    type: "matrixRain",
+    label: "Matrix Rain",
+    category: "content",
+    icon: "Code",
+    description: "Falling katakana hero (cyberpunk)",
+    defaultProps: {
+      fontSize: 16,
+      color: "#00ff88",
+      speed: 1,
+    },
+    defaultStyle: { padding: "120px 24px", background: "#000000" },
+  },
+
+  // ── Effects: text ──────────────────────────────────────────────────────
+  glitchText: {
+    type: "glitchText",
+    label: "Glitch Text",
+    category: "content",
+    icon: "Type",
+    description: "RGB-split glitch headline",
+    defaultProps: {
+      text: "SYSTEM GLITCH",
+      color: "#ffffff",
+      glitchColor1: "#ec4899",
+      glitchColor2: "#06b6d4",
+      continuous: true,
+    },
+    defaultStyle: { padding: "40px 24px", textAlign: "center" },
+  },
+  typewriterText: {
+    type: "typewriterText",
+    label: "Typewriter Text",
+    category: "content",
+    icon: "Type",
+    description: "Types out character by character",
+    defaultProps: {
+      text: "Build landing pages at the speed of thought.",
+      speed: 60,
+      loop: false,
+      caret: true,
+    },
+    defaultStyle: { padding: "40px 24px", textAlign: "center" },
+  },
+  gradientText: {
+    type: "gradientText",
+    label: "Gradient Text",
+    category: "content",
+    icon: "Type",
+    description: "Flowing animated gradient text",
+    defaultProps: {
+      text: "Beautiful by default",
+      colors: ["#8b5cf6", "#ec4899", "#06b6d4"],
+      speed: 4,
+      animate: true,
+    },
+    defaultStyle: { padding: "40px 24px", textAlign: "center" },
+  },
+  marquee: {
+    type: "marquee",
+    label: "Marquee",
+    category: "content",
+    icon: "ArrowRight",
+    description: "Infinite scrolling ticker (logos / features)",
+    defaultProps: {
+      items: ["Acme", "Globex", "Initech", "Umbrella", "Hooli", "Vandelay", "Soylent"],
+      speed: 30,
+      separator: "•",
+      pauseOnHover: true,
+      reverse: false,
+    },
+    defaultStyle: { padding: "24px 0", background: "#0a0a0f", color: "#ffffff" },
+  },
+
+  // ── Effects: scroll ────────────────────────────────────────────────────
+  parallaxLayer: {
+    type: "parallaxLayer",
+    label: "Parallax Layer",
+    category: "content",
+    icon: "Layers",
+    description: "Children scroll at different speed",
+    defaultProps: { speed: 0.5, direction: "up", children: [] },
+    defaultStyle: { padding: "60px 24px" },
+    hasChildren: true,
+  },
+  revealOnScroll: {
+    type: "revealOnScroll",
+    label: "Reveal on Scroll",
+    category: "content",
+    icon: "Eye",
+    description: "Children fade/slide in when scrolled into view",
+    defaultProps: {
+      effect: "slide-up",
+      delay: 0,
+      duration: 800,
+      threshold: 0.2,
+      once: true,
+      children: [],
+    },
+    defaultStyle: { padding: "0" },
+    hasChildren: true,
+  },
+  scrollProgress: {
+    type: "scrollProgress",
+    label: "Scroll Progress",
+    category: "content",
+    icon: "Activity",
+    description: "Sticky reading progress bar",
+    defaultProps: { position: "top", color: "#8b5cf6", height: 3 },
+    defaultStyle: { padding: "0" },
+  },
+
+  // ── Effects: interactive ───────────────────────────────────────────────
+  tiltCard: {
+    type: "tiltCard",
+    label: "Tilt Card",
+    category: "content",
+    icon: "Square",
+    description: "Card that 3D-tilts toward cursor",
+    defaultProps: { maxTilt: 15, scale: 1.03, glare: true, children: [] },
+    defaultStyle: { padding: "40px 24px" },
+    hasChildren: true,
+  },
+  magneticButton: {
+    type: "magneticButton",
+    label: "Magnetic Button",
+    category: "conversion",
+    icon: "MousePointerClick",
+    description: "Button that pulls toward cursor",
+    defaultProps: {
+      label: "Get started",
+      href: "#",
+      strength: 0.4,
+      variant: "primary",
+    },
+    defaultStyle: { padding: "60px 24px", textAlign: "center", background: "#0a0a0f" },
+  },
+
+  // ── Effects: dividers ───────────────────────────────────────────────────
+  waveDivider: {
+    type: "waveDivider",
+    label: "Wave Divider",
+    category: "layout",
+    icon: "Waves",
+    description: "SVG wave between sections",
+    defaultProps: { color: "#ffffff", height: 80, variant: "wave1", flip: false },
+    defaultStyle: { padding: "0" },
   },
 };
 

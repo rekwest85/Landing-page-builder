@@ -25,6 +25,12 @@ import {
   PieChart,
   ArrowRightLeft,
   Zap,
+  Code,
+  ArrowRight,
+  Layers,
+  Eye,
+  MousePointerClick,
+  Waves,
 } from "lucide-react";
 import { BLOCK_CATEGORIES, BLOCK_DEFINITIONS, type BlockType } from "@/lib/blocks/types";
 import { useEditorStore } from "@/stores/editor";
@@ -53,6 +59,12 @@ const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
   PieChart,
   ArrowRightLeft,
   Zap,
+  Code,
+  ArrowRight,
+  Layers,
+  Eye,
+  MousePointerClick,
+  Waves,
 };
 
 export function BlockLibrary() {
