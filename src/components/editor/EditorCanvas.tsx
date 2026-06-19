@@ -2,7 +2,6 @@
 
 import * as React from "react";
 import { useEditorStore } from "@/stores/editor";
-import { RenderTree } from "@/lib/blocks/renderer";
 import { BlockOutline } from "./BlockOutline";
 import { cn } from "@/lib/utils";
 
@@ -35,9 +34,7 @@ export function EditorCanvas() {
         {blocks.length === 0 ? (
           <EmptyState />
         ) : (
-          <BlockOutline>
-            <RenderTree blocks={blocks} />
-          </BlockOutline>
+          <BlockOutline blocks={blocks} />
         )}
       </div>
     </div>

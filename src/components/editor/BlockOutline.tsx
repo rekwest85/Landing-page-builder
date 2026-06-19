@@ -5,10 +5,10 @@ import { useEditorStore } from "@/stores/editor";
 import { cn } from "@/lib/utils";
 import { Trash2, Copy, ChevronUp, ChevronDown, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { BLOCK_DEFINITIONS } from "@/lib/blocks/types";
+import { BLOCK_DEFINITIONS, type Block } from "@/lib/blocks/types";
+import { BlockRenderer } from "@/lib/blocks/renderer";
 
-export function BlockOutline({ children }: { children: React.ReactNode }) {
-  const blocks = useEditorStore((s) => s.blocks);
+export function BlockOutline({ blocks }: { blocks: Block[] }) {
   const selectedId = useEditorStore((s) => s.selectedBlockId);
   const hoveredId = useEditorStore((s) => s.hoveredBlockId);
   const setSelected = useEditorStore((s) => s.setSelected);
@@ -118,7 +118,7 @@ export function BlockOutline({ children }: { children: React.ReactNode }) {
             )}
 
             {/* The actual rendered block */}
-            {children}
+            <BlockRenderer block={block} />
           </div>
         );
       })}
