@@ -489,7 +489,7 @@ function ColumnsBlock({ block }: { block: Block }) {
     4: "md:grid-cols-4",
   }[cols as 2 | 3 | 4];
   // Columns live at block.children (Block[][]), NOT in props
-  const columns = (block.children as Block[][]) ?? [];
+  const columns = (block.children as unknown as Block[][]) ?? [];
   return (
     <div style={styleToCss(block.style)}>
       <div className={cn("max-w-6xl mx-auto grid gap-6", colClass)}>
