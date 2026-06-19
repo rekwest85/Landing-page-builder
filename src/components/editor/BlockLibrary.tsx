@@ -20,6 +20,11 @@ import {
   Columns3,
   Minus,
   Search,
+  TrendingUp,
+  Activity,
+  PieChart,
+  ArrowRightLeft,
+  Zap,
 } from "lucide-react";
 import { BLOCK_CATEGORIES, BLOCK_DEFINITIONS, type BlockType } from "@/lib/blocks/types";
 import { useEditorStore } from "@/stores/editor";
@@ -43,6 +48,11 @@ const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
   Square,
   Columns3,
   Minus,
+  TrendingUp,
+  Activity,
+  PieChart,
+  ArrowRightLeft,
+  Zap,
 };
 
 export function BlockLibrary() {

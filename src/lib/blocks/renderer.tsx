@@ -877,6 +877,538 @@ function DividerBlock({ block }: { block: Block }) {
   );
 }
 
+// ── Animated stats / charts ─────────────────────────────────────────────────
+
+function useCountUp(target: number, duration: number = 1800, decimals: number = 0) {
+  const [value, setValue] = React.useState(0);
+  const ref = React.useRef<HTMLSpanElement>(null);
+  const started = React.useRef(false);
+
+  React.useEffect(() => {
+    if (typeof window === "undefined") return;
+    const el = ref.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          if (e.isIntersecting && !started.current) {
+            started.current = true;
+            const start = performance.now();
+            const step = (now: number) => {
+              const t = Math.min(1, (now - start) / duration);
+              // ease-out cubic
+              const eased = 1 - Math.pow(1 - t, 3);
+              setValue(target * eased);
+              if (t < 1) requestAnimationFrame(step);
+              else setValue(target);
+            };
+            requestAnimationFrame(step);
+          }
+        }
+      },
+      { threshold: 0.3 }
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [target, duration]);
+
+  return { ref, value: decimals > 0 ? value.toFixed(decimals) : Math.round(value).toString() };
+}
+
+function AnimatedStatBlock({ block }: { block: Block }) {
+  const p = block.props;
+  const { ref, value } = useCountUp(Number(p.value ?? 0), Number(p.duration ?? 1800), Number(p.decimals ?? 0));
+  return (
+    <div style={styleToCss(block.style)}>
+      <div className="max-w-3xl mx-auto text-center">
+        <div className="text-6xl md:text-7xl font-semibold bg-gradient-to-br from-white via-white to-white/40 bg-clip-text text-transparent tracking-tight tabular-nums">
+          {p.prefix ?? ""}<span ref={ref}>{value}</span>{p.suffix ?? ""}
+        </div>
+        <div className="mt-3 text-sm md:text-base text-white/60">{p.label}</div>
+      </div>
+    </div>
+  );
+}
+
+function StatProgressBlock({ block }: { block: Block }) {
+  const p = block.props;
+  const items: { label: string; value: number; max: number; suffix?: string }[] = p.items ?? [];
+  return (
+    <div style={styleToCss(block.style)}>
+      <div className="max-w-3xl mx-auto space-y-6">
+        {items.map((it, i) => (
+          <ProgressBar key={i} item={it} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ProgressBar({ item }: { item: { label: string; value: number; max: number; suffix?: string } }) {
+  const ref = React.useRef<HTMLDivElement>(null);
+  const [width, setWidth] = React.useState(0);
+  const pct = Math.min(100, Math.max(0, (item.value / item.max) * 100));
+
+  React.useEffect(() => {
+    if (typeof window === "undefined") return;
+    const el = ref.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          if (e.isIntersecting) {
+            setWidth(pct);
+          }
+        }
+      },
+      { threshold: 0.3 }
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [pct]);
+
+  return (
+    <div ref={ref}>
+      <div className="flex items-baseline justify-between mb-2">
+        <span className="text-sm font-medium text-white/80">{item.label}</span>
+        <span className="text-sm font-semibold text-white tabular-nums">
+          {item.value}{item.suffix ?? ""}
+        </span>
+      </div>
+      <div className="h-2 rounded-full bg-white/[0.06] overflow-hidden">
+        <div
+          className="h-full rounded-full bg-gradient-to-r from-violet-500 to-indigo-500 transition-all duration-[1500ms] ease-out"
+          style={{ width: `${width}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function BarChartBlock({ block }: { block: Block }) {
+  const p = block.props;
+  const data: { label: string; value: number }[] = p.data ?? [];
+  const max = Math.max(...data.map((d) => d.value), 1);
+  const highlightMax = p.highlightMax ?? true;
+  const maxIdx = data.findIndex((d) => d.value === max);
+
+  return (
+    <div style={styleToCss(block.style)}>
+      <div className="max-w-4xl mx-auto">
+        {p.title && (
+          <h3 className="text-lg font-semibold text-white mb-6 text-center">{p.title}</h3>
+        )}
+        <div className="flex items-end justify-around gap-3 h-64 px-4">
+          {data.map((d, i) => {
+            const heightPct = (d.value / max) * 100;
+            const isMax = highlightMax && i === maxIdx;
+            return (
+              <div key={i} className="flex-1 flex flex-col items-center justify-end gap-2 group">
+                <div className="text-xs font-medium text-white/60 tabular-nums opacity-0 group-hover:opacity-100 transition-opacity">
+                  {d.value}{p.unit ?? ""}
+                </div>
+                <Bar heightPct={heightPct} highlight={isMax} />
+                <div className="text-xs text-white/50">{d.label}</div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Bar({ heightPct, highlight }: { heightPct: number; highlight: boolean }) {
+  const ref = React.useRef<HTMLDivElement>(null);
+  const [h, setH] = React.useState(0);
+  React.useEffect(() => {
+    if (typeof window === "undefined") return;
+    const el = ref.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          if (e.isIntersecting) setH(heightPct);
+        }
+      },
+      { threshold: 0.2 }
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [heightPct]);
+
+  return (
+    <div
+      ref={ref}
+      style={{ height: `${h}%` }}
+      className={`w-full rounded-t-lg transition-all duration-[1500ms] ease-out ${
+        highlight
+          ? "bg-gradient-to-t from-violet-600 to-violet-400 shadow-[0_0_24px_-4px_rgba(139,92,246,0.6)]"
+          : "bg-gradient-to-t from-white/10 to-white/20"
+      }`}
+    />
+  );
+}
+
+function LineChartBlock({ block }: { block: Block }) {
+  const p = block.props;
+  const data: number[] = p.data ?? [];
+  const labels: string[] = p.labels ?? ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const max = Math.max(...data, 1);
+  const min = Math.min(...data, 0);
+  const range = Math.max(max - min, 1);
+
+  // Build SVG path
+  const W = 600, H = 200, padX = 30, padY = 20;
+  const innerW = W - padX * 2;
+  const innerH = H - padY * 2;
+  const points = data.map((v, i) => {
+    const x = padX + (i / Math.max(data.length - 1, 1)) * innerW;
+    const y = padY + (1 - (v - min) / range) * innerH;
+    return [x, y] as const;
+  });
+  const smooth = p.smooth ?? true;
+  const linePath = smooth ? buildSmoothPath(points) : buildLinearPath(points);
+  const areaPath = linePath + ` L ${padX + innerW},${padY + innerH} L ${padX},${padY + innerH} Z`;
+
+  return (
+    <div style={styleToCss(block.style)}>
+      <div className="max-w-4xl mx-auto">
+        {p.title && (
+          <h3 className="text-lg font-semibold text-white mb-6 text-center">{p.title}</h3>
+        )}
+        <LineDraw target={linePath} targetArea={areaPath} points={points} labels={labels.slice(0, data.length)} />
+      </div>
+    </div>
+  );
+}
+
+function LineDraw({
+  target, targetArea, points, labels,
+}: { target: string; targetArea: string; points: readonly (readonly [number, number])[]; labels: string[] }) {
+  const [progress, setProgress] = React.useState(0);
+  const ref = React.useRef<SVGSVGElement>(null);
+  React.useEffect(() => {
+    if (typeof window === "undefined") return;
+    const el = ref.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          if (e.isIntersecting) {
+            const start = performance.now();
+            const dur = 1600;
+            const step = (now: number) => {
+              const t = Math.min(1, (now - start) / dur);
+              const eased = 1 - Math.pow(1 - t, 3);
+              setProgress(eased);
+              if (t < 1) requestAnimationFrame(step);
+            };
+            requestAnimationFrame(step);
+          }
+        }
+      },
+      { threshold: 0.2 }
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
+
+  const W = 600, H = 200, padX = 30, padY = 20;
+  const innerH = H - padY * 2;
+
+  // Reveal via stroke-dasharray: build path length = ~ len of "M ... L ..." (approx)
+  const totalLen = 1500;
+  const visibleLen = totalLen * progress;
+
+  return (
+    <svg ref={ref} viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" preserveAspectRatio="xMidYMid meet">
+      <defs>
+        <linearGradient id="line-grad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#8b5cf6" stopOpacity="0.5" />
+          <stop offset="100%" stopColor="#8b5cf6" stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      {/* gridlines */}
+      {[0, 0.25, 0.5, 0.75, 1].map((g, i) => (
+        <line key={i} x1={padX} x2={W - padX} y1={padY + g * innerH} y2={padY + g * innerH} stroke="rgba(255,255,255,0.05)" strokeWidth="1" />
+      ))}
+      {/* area */}
+      <path d={targetArea} fill="url(#line-grad)" style={{ opacity: progress }} />
+      {/* line */}
+      <path
+        d={target}
+        fill="none"
+        stroke="#8b5cf6"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        strokeDasharray={`${visibleLen} ${totalLen}`}
+      />
+      {/* points */}
+      {points.map(([x, y], i) => (
+        <circle
+          key={i}
+          cx={x}
+          cy={y}
+          r="3"
+          fill="#8b5cf6"
+          style={{ opacity: progress, transition: `opacity 0.2s ${i * 50}ms` }}
+        />
+      ))}
+      {/* x labels */}
+      {labels.map((label, i) => {
+        const x = padX + (i / Math.max(labels.length - 1, 1)) * (W - padX * 2);
+        return (
+          <text key={i} x={x} y={H - 4} textAnchor="middle" fill="rgba(255,255,255,0.4)" fontSize="10">
+            {label}
+          </text>
+        );
+      })}
+    </svg>
+  );
+}
+
+function buildLinearPath(points: readonly (readonly [number, number])[]): string {
+  if (points.length === 0) return "";
+  return points.map(([x, y], i) => `${i === 0 ? "M" : "L"} ${x} ${y}`).join(" ");
+}
+
+function buildSmoothPath(points: readonly (readonly [number, number])[]): string {
+  if (points.length === 0) return "";
+  const parts: string[] = [`M ${points[0][0]} ${points[0][1]}`];
+  for (let i = 0; i < points.length - 1; i++) {
+    const [x0, y0] = points[i];
+    const [x1, y1] = points[i + 1];
+    const cx = (x0 + x1) / 2;
+    parts.push(`C ${cx} ${y0}, ${cx} ${y1}, ${x1} ${y1}`);
+  }
+  return parts.join(" ");
+}
+
+function DonutChartBlock({ block }: { block: Block }) {
+  const p = block.props;
+  const segments: { label: string; value: number; color?: string }[] = p.segments ?? [];
+  const total = segments.reduce((sum, s) => sum + s.value, 0) || 1;
+
+  // Build conic gradient stops
+  let acc = 0;
+  const stops = segments.map((s) => {
+    const start = (acc / total) * 360;
+    acc += s.value;
+    const end = (acc / total) * 360;
+    return `${s.color ?? "#8b5cf6"} ${start}deg ${end}deg`;
+  });
+  const conicBg = `conic-gradient(${stops.join(", ")})`;
+
+  return (
+    <div style={styleToCss(block.style)}>
+      <div className="max-w-4xl mx-auto">
+        {p.title && (
+          <h3 className="text-lg font-semibold text-white mb-6 text-center">{p.title}</h3>
+        )}
+        <div className="flex flex-col md:flex-row items-center justify-center gap-8">
+          <div className="relative h-56 w-56 rounded-full" style={{ background: conicBg }}>
+            <div className="absolute inset-6 rounded-full bg-[#0a0a0f] flex flex-col items-center justify-center">
+              <div className="text-3xl font-semibold text-white tabular-nums">{p.centerValue}</div>
+              <div className="text-xs text-white/50 mt-1">{p.centerLabel}</div>
+            </div>
+          </div>
+          <ul className="space-y-2 min-w-[200px]">
+            {segments.map((s, i) => (
+              <li key={i} className="flex items-center justify-between gap-3 text-sm">
+                <span className="flex items-center gap-2">
+                  <span className="h-2.5 w-2.5 rounded-sm" style={{ background: s.color ?? "#8b5cf6" }} />
+                  <span className="text-white/70">{s.label}</span>
+                </span>
+                <span className="text-white tabular-nums">{Math.round((s.value / total) * 100)}%</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Conversion / effect ─────────────────────────────────────────────────────
+
+function ComparisonTableBlock({ block }: { block: Block }) {
+  const p = block.props;
+  const rows: { feature: string; ours: string | boolean; theirs: string | boolean }[] = p.rows ?? [];
+  return (
+    <div style={styleToCss(block.style)}>
+      <div className="max-w-3xl mx-auto">
+        {p.title && (
+          <h3 className="text-xl font-semibold text-white mb-6 text-center">{p.title}</h3>
+        )}
+        <div className="rounded-2xl border border-white/[0.08] bg-white/[0.02] overflow-hidden">
+          {/* Header */}
+          <div className="grid grid-cols-[1fr_auto_auto] gap-4 px-5 py-3 border-b border-white/[0.06] bg-white/[0.02]">
+            <div className="text-xs uppercase tracking-wider text-white/40 font-medium">Feature</div>
+            <div className="text-xs uppercase tracking-wider text-violet-200 font-medium text-center min-w-[100px]">{p.oursLabel ?? "Us"}</div>
+            <div className="text-xs uppercase tracking-wider text-white/40 font-medium text-center min-w-[100px]">{p.theirsLabel ?? "Them"}</div>
+          </div>
+          {rows.map((row, i) => (
+            <div
+              key={i}
+              className={`grid grid-cols-[1fr_auto_auto] gap-4 px-5 py-3 ${
+                i !== rows.length - 1 ? "border-b border-white/[0.04]" : ""
+              }`}
+            >
+              <div className="text-sm text-white/80">{row.feature}</div>
+              <div className="flex justify-center min-w-[100px]">
+                <CellValue value={row.ours} highlight />
+              </div>
+              <div className="flex justify-center min-w-[100px]">
+                <CellValue value={row.theirs} />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CellValue({ value, highlight }: { value: string | boolean; highlight?: boolean }) {
+  if (value === true) {
+    return (
+      <span className={`inline-flex items-center justify-center h-6 w-6 rounded-full ${
+        highlight ? "bg-violet-500/20 text-violet-200" : "bg-white/[0.04] text-white/40"
+      }`}>
+        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+        </svg>
+      </span>
+    );
+  }
+  if (value === false) {
+    return (
+      <span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-white/[0.04] text-white/30">
+        <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </span>
+    );
+  }
+  return (
+    <span className={`text-xs ${highlight ? "text-violet-200" : "text-white/50"}`}>{value}</span>
+  );
+}
+
+function BeforeAfterBlock({ block }: { block: Block }) {
+  const p = block.props;
+  return (
+    <div style={styleToCss(block.style)}>
+      <div className="max-w-5xl mx-auto">
+        {p.title && (
+          <h3 className="text-xl font-semibold text-white mb-8 text-center">{p.title}</h3>
+        )}
+        <div className="grid md:grid-cols-2 gap-5">
+          <div className="rounded-2xl border border-white/[0.08] bg-white/[0.02] p-6">
+            <div className="inline-flex items-center gap-2 rounded-full bg-red-500/10 border border-red-500/20 px-3 py-1 text-xs font-medium text-red-200 mb-5">
+              <span className="h-1.5 w-1.5 rounded-full bg-red-400" />
+              {p.beforeLabel}
+            </div>
+            <ul className="space-y-3">
+              {(p.beforePoints ?? []).map((pt: string, i: number) => (
+                <li key={i} className="flex items-start gap-3 text-sm text-white/70">
+                  <span className="mt-1 h-1.5 w-1.5 rounded-full bg-red-400/60 shrink-0" />
+                  <span>{pt}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div className="rounded-2xl border border-violet-500/30 bg-gradient-to-b from-violet-500/[0.08] to-transparent p-6 shadow-[0_0_48px_-12px_rgba(139,92,246,0.4)]">
+            <div className="inline-flex items-center gap-2 rounded-full bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 text-xs font-medium text-emerald-200 mb-5">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+              {p.afterLabel}
+            </div>
+            <ul className="space-y-3">
+              {(p.afterPoints ?? []).map((pt: string, i: number) => (
+                <li key={i} className="flex items-start gap-3 text-sm text-white">
+                  <svg className="mt-0.5 h-4 w-4 text-violet-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                  <span>{pt}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function GradientCardBlock({ block }: { block: Block }) {
+  const p = block.props;
+  return (
+    <div style={styleToCss(block.style)}>
+      <div className="max-w-xl mx-auto relative group">
+        {/* Animated gradient border */}
+        <div className="absolute -inset-px rounded-2xl bg-gradient-to-r from-violet-500 via-fuchsia-500 to-indigo-500 opacity-70 blur-sm group-hover:opacity-100 transition-opacity animate-[gradient-shift_6s_linear_infinite]"
+             style={{ backgroundSize: "200% 200%" }} />
+        <div className="relative rounded-2xl bg-[#0a0a0f] p-8">
+          {p.eyebrow && (
+            <div className="inline-flex items-center gap-2 rounded-full border border-violet-500/30 bg-violet-500/10 px-3 py-1 text-xs font-medium text-violet-200 mb-4">
+              {p.eyebrow}
+            </div>
+          )}
+          <h3 className="text-xl md:text-2xl font-semibold text-white mb-2">{p.title}</h3>
+          {p.body && <p className="text-sm text-white/60 leading-relaxed mb-5">{p.body}</p>}
+          {p.ctaLabel && (
+            <a
+              href={p.ctaHref}
+              className="inline-flex items-center gap-2 rounded-full bg-white/[0.06] border border-white/[0.1] text-white px-4 py-2 text-sm font-medium hover:bg-white/[0.1] transition-colors"
+            >
+              {p.ctaLabel}
+              <ArrowRight className="h-4 w-4" />
+            </a>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function GlowCTABlock({ block }: { block: Block }) {
+  const p = block.props;
+  return (
+    <div style={styleToCss(block.style)} className="relative overflow-hidden">
+      {/* Pulsing glow */}
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+        <div className="h-72 w-[600px] rounded-full bg-violet-500/30 blur-[100px] animate-pulse" />
+      </div>
+      <div className="relative max-w-4xl mx-auto text-center">
+        <h2 className="text-4xl md:text-6xl font-semibold tracking-tight text-white">
+          {p.headline}
+        </h2>
+        {p.subheadline && (
+          <p className="mt-5 text-lg text-white/60 max-w-2xl mx-auto">{p.subheadline}</p>
+        )}
+        <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-3">
+          <a
+            href={p.ctaHref}
+            className="inline-flex items-center gap-2 rounded-full bg-gradient-to-b from-violet-500 to-indigo-600 px-7 py-3.5 text-sm font-semibold text-white shadow-[0_0_40px_-4px_rgba(139,92,246,0.7)] hover:from-violet-400 hover:to-indigo-500 transition-all"
+          >
+            {p.ctaLabel}
+            <ArrowRight className="h-4 w-4" />
+          </a>
+          {p.secondaryLabel && (
+            <a
+              href={p.secondaryHref ?? "#"}
+              className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] text-white px-6 py-3 text-sm font-medium hover:bg-white/[0.08] transition-colors"
+            >
+              {p.secondaryLabel}
+            </a>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Registry ─────────────────────────────────────────────────────────────────
 
 const REGISTRY: Record<string, React.FC<{ block: Block }>> = {
@@ -898,6 +1430,15 @@ const REGISTRY: Record<string, React.FC<{ block: Block }>> = {
   columns: ColumnsBlock,
   spacer: SpacerBlock,
   divider: DividerBlock,
+  animatedStat: AnimatedStatBlock,
+  statProgress: StatProgressBlock,
+  barChart: BarChartBlock,
+  lineChart: LineChartBlock,
+  donutChart: DonutChartBlock,
+  comparisonTable: ComparisonTableBlock,
+  beforeAfter: BeforeAfterBlock,
+  gradientCard: GradientCardBlock,
+  glowCta: GlowCTABlock,
 };
 
 export function BlockRenderer({ block }: { block: Block }) {
