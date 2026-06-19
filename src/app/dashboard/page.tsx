@@ -5,6 +5,10 @@ import { prisma } from "@/lib/db";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { DeletePageButton } from "@/components/dashboard/DeletePageButton";
+import { PageThumbnail } from "@/components/dashboard/PageThumbnail";
+
+// Always re-render — depends on live DB state
+export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
   const dbAvailable = prisma !== null;
@@ -159,10 +163,8 @@ export default async function DashboardPage() {
                       {page.status.toLowerCase()}
                     </span>
                   </div>
-                  <div className="aspect-[16/9] rounded-lg bg-white/[0.04] border border-white/[0.06] mb-3 overflow-hidden flex items-center justify-center text-[10px] text-white/30">
-                    {Array.isArray(page.tree) && page.tree.length > 0
-                      ? `${(page.tree as any[]).length} blocks`
-                      : "Empty"}
+                  <div className="mb-3">
+                    <PageThumbnail blocks={(page.tree as any[]) ?? []} />
                   </div>
                   <div className="text-xs text-white/40">
                     Updated {new Date(page.updatedAt).toLocaleDateString()}

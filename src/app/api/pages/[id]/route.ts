@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { z } from "zod";
 
@@ -47,7 +48,18 @@ export async function DELETE(
   if (!prisma) return NextResponse.json({ error: "Database not configured" }, { status: 503 });
 
   const { id } = await params;
-  await prisma.page.delete({ where: { id } });
+  try {
+    await prisma.page.delete({ where: { id } });
+  } catch (err: any) {
+    // P2025: record not found — already deleted, treat as success
+    if (err?.code === "P2025") {
+      revalidatePath("/dashboard");
+      return NextResponse.json({ ok: true, alreadyDeleted: true });
+    }
+    throw err;
+  }
+  // Invalidate the dashboard route cache so the deleted page disappears from the list
+  revalidatePath("/dashboard");
   return NextResponse.json({ ok: true });
 }
 

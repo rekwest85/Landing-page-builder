@@ -163,3 +163,19 @@ html, body {
 .has-custom-color * {
   color: var(--forge-color) !important;
 }
+
+/* ── Dashboard thumbnails ───────────────────────────────────────────────────
+   Renders tiny page previews. Freeze all animations and disable interactivity
+   so the thumbnail is static + cheap to render. */
+.thumbnail-frozen,
+.thumbnail-frozen * {
+  animation-play-state: paused !important;
+  animation-delay: 0s !important;
+  animation-duration: 0s !important;
+  transition: none !important;
+  caret-color: transparent !important;
+}
+.thumbnail-frozen canvas {
+  /* Canvas-based effects would otherwise re-render every frame */
+  display: none !important;
+}
