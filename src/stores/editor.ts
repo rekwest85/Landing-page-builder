@@ -28,6 +28,7 @@ interface EditorState {
   duplicateBlock: (id: string) => void;
   moveBlock: (id: string, direction: "up" | "down") => void;
   updateBlockProps: (id: string, props: Record<string, any>) => void;
+  updateInnerBlockProps: (id: string, props: Record<string, any>) => void;
   updateBlockStyle: (id: string, style: Record<string, any>) => void;
   replaceBlock: (id: string, block: Block) => void;
   insertBlocks: (blocks: Block[], index?: number) => void;
@@ -167,6 +168,29 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       ),
       isDirty: true,
     });
+  },
+
+  updateInnerBlockProps: (id, props) => {
+    // Recursively updates a block's props anywhere in the tree
+    // (inside columns.children[][], sections.children[], etc.)
+    const updateIn = (blocks: Block[]): Block[] =>
+      blocks.map((b) => {
+        if (b.id === id) return { ...b, props: { ...b.props, ...props } };
+        if (Array.isArray(b.children) && b.children.length > 0) {
+          if (Array.isArray(b.children[0])) {
+            // columns: Block[][]
+            const next = (b.children as unknown as Block[][]).map(
+              (col) => updateIn(col)
+            );
+            return { ...b, children: next as unknown as Block[] };
+          }
+          // section: Block[]
+          const next = updateIn(b.children as unknown as Block[]);
+          return { ...b, children: next };
+        }
+        return b;
+      });
+    set({ blocks: updateIn(get().blocks), isDirty: true });
   },
 
   updateBlockStyle: (id, style) => {

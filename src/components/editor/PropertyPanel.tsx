@@ -3,6 +3,7 @@
 import * as React from "react";
 import { useEditorStore } from "@/stores/editor";
 import { BLOCK_DEFINITIONS, type Block, type BlockType } from "@/lib/blocks/types";
+import { findBlockById } from "@/lib/blocks/find";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -12,12 +13,12 @@ import { cn } from "@/lib/utils";
 export function PropertyPanel() {
   const blocks = useEditorStore((s) => s.blocks);
   const selectedId = useEditorStore((s) => s.selectedBlockId);
-  const updateBlockProps = useEditorStore((s) => s.updateBlockProps);
+  const updateInnerBlockProps = useEditorStore((s) => s.updateInnerBlockProps);
   const setColumnCount = useEditorStore((s) => s.setColumnCount);
   const setAiGenerating = useEditorStore((s) => s.setAiGenerating);
   const setRightPanelTab = useEditorStore((s) => s.setRightPanelTab);
 
-  const block = blocks.find((b) => b.id === selectedId);
+  const block = blocks.find((b) => b.id === selectedId) ?? findBlockById(blocks, selectedId ?? "");
 
   if (!block) {
     return (
@@ -42,7 +43,7 @@ export function PropertyPanel() {
         body: JSON.stringify({ type: block.type, props: block.props }),
       });
       const data = await res.json();
-      if (data.props) updateBlockProps(block.id, data.props);
+      if (data.props) updateInnerBlockProps(block.id, data.props);
     } catch (err) {
       console.error(err);
     } finally {
@@ -87,7 +88,7 @@ export function PropertyPanel() {
             fieldKey={key}
             value={block.props[key]}
             defaultValue={defaultValue}
-            onChange={(v) => updateBlockProps(block.id, { [key]: v })}
+            onChange={(v) => updateInnerBlockProps(block.id, { [key]: v })}
           />
         ))}
       </div>
