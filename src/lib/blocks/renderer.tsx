@@ -9,6 +9,7 @@ import type { Block } from "./types";
 import { cn } from "@/lib/utils";
 import { ArrowRight, Zap, Sparkles, Target, Quote, Star } from "lucide-react";
 import * as React from "react";
+import { createPortal } from "react-dom";
 import { useEditorStore } from "@/stores/editor";
 
 // ── Icon resolver (string → component) ───────────────────────────────────────
@@ -518,7 +519,12 @@ function Column({
 }) {
   const addBlockToColumn = useEditorStore((s) => s.addBlockToColumn);
   const [isDragOver, setIsDragOver] = React.useState(false);
-  const [pickerOpen, setPickerOpen] = React.useState(false);
+  const [pickerPos, setPickerPos] = React.useState<{
+    open: boolean;
+    x: number;
+    y: number;
+  } | null>(null);
+  const columnRef = React.useRef<HTMLDivElement>(null);
 
   function onDrop(e: React.DragEvent) {
     e.preventDefault();
@@ -539,13 +545,31 @@ function Column({
     setIsDragOver(false);
   }
 
-  function onClickEmpty(e: React.MouseEvent) {
-    e.stopPropagation();
-    setPickerOpen((v) => !v);
+  function openPicker() {
+    const el = columnRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    // Place picker below the column; if not enough room, flip above
+    const pickerW = 240;
+    const pickerH = 180;
+    const margin = 8;
+    let x = rect.left;
+    let y = rect.bottom + margin;
+    // Flip up if it would overflow the bottom
+    if (y + pickerH > window.innerHeight - margin) {
+      y = rect.top - pickerH - margin;
+    }
+    // Clamp X so picker doesn't go off-screen
+    if (x + pickerW > window.innerWidth - margin) {
+      x = window.innerWidth - pickerW - margin;
+    }
+    if (x < margin) x = margin;
+    setPickerPos({ open: true, x, y });
   }
 
   return (
     <div
+      ref={columnRef}
       className={cn(
         "space-y-4 min-h-[80px] rounded-xl transition-all",
         isDragOver && "ring-2 ring-violet-500 ring-offset-2"
@@ -558,16 +582,18 @@ function Column({
       {(column?.length ?? 0) > 0 ? (
         column.map((child) => <BlockRenderer key={child.id} block={child} />)
       ) : (
-        <EmptyColumn onClick={onClickEmpty} highlighted={isDragOver} />
+        <EmptyColumn onClick={openPicker} highlighted={isDragOver} />
       )}
 
-      {pickerOpen && (
+      {pickerPos?.open && (
         <ColumnBlockPicker
+          x={pickerPos.x}
+          y={pickerPos.y}
           onPick={(type) => {
             addBlockToColumn(blockId, columnIndex, type);
-            setPickerOpen(false);
+            setPickerPos(null);
           }}
-          onClose={() => setPickerOpen(false)}
+          onClose={() => setPickerPos(null)}
         />
       )}
     </div>
@@ -603,9 +629,13 @@ function EmptyColumn({
 }
 
 function ColumnBlockPicker({
+  x,
+  y,
   onPick,
   onClose,
 }: {
+  x: number;
+  y: number;
   onPick: (type: any) => void;
   onClose: () => void;
 }) {
@@ -629,18 +659,24 @@ function ColumnBlockPicker({
     { type: "stats", label: "Stats" },
   ];
 
-  return (
+  // Portal to document.body so we escape any overflow:hidden/auto
+  // ancestors (the canvas uses overflow-auto). Position via fixed coords
+  // calculated from the column's bounding rect.
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
     <>
       {/* Click-outside backdrop */}
       <div
-        className="fixed inset-0 z-40"
+        className="fixed inset-0 z-[60]"
         onClick={(e) => {
           e.stopPropagation();
           onClose();
         }}
       />
       <div
-        className="relative z-50 mt-2 rounded-xl border border-violet-500/30 bg-white shadow-xl p-2 grid grid-cols-2 gap-1"
+        style={{ position: "fixed", left: x, top: y, width: 240 }}
+        className="z-[70] rounded-xl border border-violet-500/30 bg-white shadow-2xl p-2 grid grid-cols-2 gap-1"
         onClick={(e) => e.stopPropagation()}
       >
         {choices.map((c) => (
@@ -657,7 +693,8 @@ function ColumnBlockPicker({
           </button>
         ))}
       </div>
-    </>
+    </>,
+    document.body
   );
 }
 
