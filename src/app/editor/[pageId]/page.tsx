@@ -32,6 +32,7 @@ export default async function EditorPage({
   return (
     <Editor
       pageId={page.id}
+      slug={page.slug}
       title={page.title}
       blocks={(page.tree as any) ?? []}
     />

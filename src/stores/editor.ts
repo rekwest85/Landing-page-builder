@@ -10,9 +10,10 @@ export type RightPanelTab = "design" | "ai" | "style";
 interface EditorState {
   // Page data
   pageId: string | null;
+  pageSlug: string | null;
   pageTitle: string;
   blocks: Block[];
-  setPage: (pageId: string, title: string, blocks: Block[]) => void;
+  setPage: (pageId: string, slug: string, title: string, blocks: Block[]) => void;
 
   // Selection
   selectedBlockId: string | null;
@@ -55,11 +56,12 @@ interface EditorState {
 
 export const useEditorStore = create<EditorState>((set, get) => ({
   pageId: null,
+  pageSlug: null,
   pageTitle: "",
   blocks: [],
 
-  setPage: (pageId, pageTitle, blocks) =>
-    set({ pageId, pageTitle, blocks, isDirty: false }),
+  setPage: (pageId, pageSlug, pageTitle, blocks) =>
+    set({ pageId, pageSlug, pageTitle, blocks, isDirty: false }),
 
   selectedBlockId: null,
   hoveredBlockId: null,

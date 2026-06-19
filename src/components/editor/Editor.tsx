@@ -11,18 +11,20 @@ import type { Block } from "@/lib/blocks/types";
 
 export function Editor({
   pageId,
+  slug,
   title,
   blocks,
 }: {
   pageId: string;
+  slug: string;
   title: string;
   blocks: Block[];
 }) {
   const setPage = useEditorStore((s) => s.setPage);
 
   React.useEffect(() => {
-    setPage(pageId, title, blocks);
-  }, [pageId, title, blocks, setPage]);
+    setPage(pageId, slug, title, blocks);
+  }, [pageId, slug, title, blocks, setPage]);
 
   return (
     <TooltipProvider delayDuration={200}>

@@ -1,10 +1,21 @@
 "use client";
 
 import * as React from "react";
+import { useRouter } from "next/navigation";
 import { useEditorStore, type ViewMode } from "@/stores/editor";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Monitor, Tablet, Smartphone, Eye, Share2, Rocket, Loader2 } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Monitor,
+  Tablet,
+  Smartphone,
+  Eye,
+  Share2,
+  Rocket,
+  Loader2,
+  ArrowLeft,
+} from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -12,18 +23,22 @@ export function EditorTopBar() {
   const pageTitle = useEditorStore((s) => s.pageTitle);
   const blocks = useEditorStore((s) => s.blocks);
   const pageId = useEditorStore((s) => s.pageId);
+  const pageSlug = useEditorStore((s) => s.pageSlug);
   const viewMode = useEditorStore((s) => s.viewMode);
   const setViewMode = useEditorStore((s) => s.setViewMode);
   const isDirty = useEditorStore((s) => s.isDirty);
+
+  const router = useRouter();
 
   const [title, setTitle] = React.useState(pageTitle);
   React.useEffect(() => setTitle(pageTitle), [pageTitle]);
 
   const [saving, setSaving] = React.useState(false);
   const [publishing, setPublishing] = React.useState(false);
+  const [previewing, setPreviewing] = React.useState(false);
 
   async function save() {
-    if (!pageId) return;
+    if (!pageId) return false;
     setSaving(true);
     try {
       const res = await fetch(`/api/pages/${pageId}`, {
@@ -33,9 +48,10 @@ export function EditorTopBar() {
       });
       if (!res.ok) throw new Error("Save failed");
       useEditorStore.getState().markClean();
-      toast.success("Saved");
+      return true;
     } catch (err) {
       toast.error("Failed to save");
+      return false;
     } finally {
       setSaving(false);
     }
@@ -45,7 +61,8 @@ export function EditorTopBar() {
     if (!pageId) return;
     setPublishing(true);
     try {
-      await save();
+      const saved = await save();
+      if (!saved) throw new Error("Save failed");
       const res = await fetch(`/api/pages/${pageId}/publish`, { method: "POST" });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Publish failed");
@@ -63,11 +80,41 @@ export function EditorTopBar() {
     }
   }
 
+  async function preview() {
+    if (!pageSlug) return;
+    setPreviewing(true);
+    try {
+      // Save first so the preview reflects the latest edits
+      const saved = await save();
+      if (!saved) throw new Error("Save failed before preview");
+      const url = `${window.location.origin}/p/${pageSlug}`;
+      window.open(url, "_blank");
+    } catch (err: any) {
+      toast.error(err.message ?? "Failed to open preview");
+    } finally {
+      setPreviewing(false);
+    }
+  }
+
   async function share() {
-    if (!pageId) return;
-    const url = `${window.location.origin}/p/${pageId}`;
+    if (!pageSlug) {
+      toast.error("Save the page first to get a shareable link");
+      return;
+    }
+    const url = `${window.location.origin}/p/${pageSlug}`;
     await navigator.clipboard.writeText(url);
-    toast.success("Preview link copied to clipboard");
+    toast.success("Preview link copied to clipboard", {
+      description: url,
+    });
+  }
+
+  function back() {
+    // If there are unsaved changes, warn before navigating
+    if (isDirty) {
+      const ok = window.confirm("You have unsaved changes. Leave anyway?");
+      if (!ok) return;
+    }
+    router.push("/dashboard");
   }
 
   // Auto-save every 5s when dirty
@@ -77,20 +124,40 @@ export function EditorTopBar() {
     return () => clearTimeout(t);
   }, [isDirty, blocks, title]);
 
-  // Save on Cmd/Ctrl+S
+  // Save on Cmd/Ctrl+S, Preview on Cmd/Ctrl+P
   React.useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key === "s") {
         e.preventDefault();
         save();
       }
+      if ((e.metaKey || e.ctrlKey) && e.key === "p") {
+        e.preventDefault();
+        preview();
+      }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [blocks, title, pageId]);
+  }, [blocks, title, pageId, pageSlug]);
 
   return (
     <div className="flex items-center gap-3 h-12 px-3 border-b border-white/[0.06] bg-[#0a0a0f]/80 backdrop-blur-md">
+      {/* Back to projects */}
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            onClick={back}
+            aria-label="Back to projects"
+            className="inline-flex items-center justify-center h-8 w-8 rounded-md text-white/60 hover:text-white hover:bg-white/[0.06] transition-colors"
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent side="bottom" sideOffset={6}>
+          Back to projects
+        </TooltipContent>
+      </Tooltip>
+
       {/* Logo */}
       <div className="flex items-center gap-2 mr-2">
         <div className="inline-flex items-center justify-center h-6 w-6 rounded-md bg-gradient-to-br from-violet-500 to-indigo-600 shadow-[0_0_12px_-2px_rgba(139,92,246,0.5)]">
@@ -139,10 +206,32 @@ export function EditorTopBar() {
       </div>
 
       {/* Actions */}
-      <Button variant="ghost" size="sm" onClick={share}>
-        <Share2 className="h-3.5 w-3.5" />
-        Share
-      </Button>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button variant="ghost" size="sm" onClick={preview} disabled={previewing}>
+            {previewing ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Eye className="h-3.5 w-3.5" />
+            )}
+            Preview
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent side="bottom" sideOffset={6}>
+          Open the published page in a new tab
+        </TooltipContent>
+      </Tooltip>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button variant="ghost" size="sm" onClick={share}>
+            <Share2 className="h-3.5 w-3.5" />
+            Share
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent side="bottom" sideOffset={6}>
+          Copy the preview link
+        </TooltipContent>
+      </Tooltip>
       <Button variant="primary" size="sm" onClick={publish} disabled={publishing}>
         {publishing ? (
           <Loader2 className="h-3.5 w-3.5 animate-spin" />
