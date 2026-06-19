@@ -13,6 +13,7 @@ export function PropertyPanel() {
   const blocks = useEditorStore((s) => s.blocks);
   const selectedId = useEditorStore((s) => s.selectedBlockId);
   const updateBlockProps = useEditorStore((s) => s.updateBlockProps);
+  const setColumnCount = useEditorStore((s) => s.setColumnCount);
   const setAiGenerating = useEditorStore((s) => s.setAiGenerating);
   const setRightPanelTab = useEditorStore((s) => s.setRightPanelTab);
 
@@ -71,7 +72,16 @@ export function PropertyPanel() {
 
       {/* Block-specific fields */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {Object.entries(def.defaultProps ?? {}).map(([key, defaultValue]) => (
+        {/* Special: column count needs to resize the children[][] array */}
+        {block.type === "columns" && (
+          <ColumnCountPicker
+            value={block.props.columns ?? 2}
+            onChange={(n) => setColumnCount(block.id, n)}
+          />
+        )}
+        {Object.entries(def.defaultProps ?? {})
+          .filter(([key]) => !(block.type === "columns" && key === "columns"))
+          .map(([key, defaultValue]) => (
           <FieldEditor
             key={key}
             fieldKey={key}
@@ -183,13 +193,8 @@ function FieldEditor({
   }
 
   // Select (alignment)
-  if (fieldKey === "align" || fieldKey === "columns") {
-    const options =
-      fieldKey === "align"
-        ? ["left", "center", "right"]
-        : fieldKey === "columns"
-          ? [2, 3, 4]
-          : [];
+  if (fieldKey === "align") {
+    const options = ["left", "center", "right"];
     return (
       <div>
         <label className="block text-xs font-medium text-white/70 mb-1.5">{label}</label>
@@ -212,6 +217,9 @@ function FieldEditor({
       </div>
     );
   }
+
+  // Column count is handled specially in PropertyPanel (see ColumnCountPicker)
+  // because it also needs to resize the children[][] array, not just props.columns.
 
   // Default text input
   return (
@@ -314,4 +322,37 @@ function humanize(s: string): string {
     .replace(/([A-Z])/g, " $1")
     .replace(/^./, (c) => c.toUpperCase())
     .trim();
+}
+
+function ColumnCountPicker({
+  value,
+  onChange,
+}: {
+  value: number;
+  onChange: (n: 2 | 3 | 4) => void;
+}) {
+  const options: (2 | 3 | 4)[] = [2, 3, 4];
+  return (
+    <div>
+      <label className="block text-xs font-medium text-white/70 mb-1.5">
+        Columns
+      </label>
+      <div className="grid grid-cols-3 gap-1">
+        {options.map((opt) => (
+          <button
+            key={opt}
+            onClick={() => onChange(opt)}
+            className={cn(
+              "h-8 rounded-md text-xs font-medium border transition-all",
+              value === opt
+                ? "bg-violet-500/20 border-violet-500/40 text-violet-100"
+                : "bg-white/[0.02] border-white/[0.06] text-white/60 hover:bg-white/[0.05]"
+            )}
+          >
+            {opt}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
 }

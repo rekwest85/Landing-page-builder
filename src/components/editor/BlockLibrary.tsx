@@ -97,9 +97,17 @@ export function BlockLibrary() {
                   return (
                     <button
                       key={block.type}
+                      draggable
+                      onDragStart={(e) => {
+                        e.dataTransfer.setData(
+                          "application/x-forge-block",
+                          block.type
+                        );
+                        e.dataTransfer.effectAllowed = "copy";
+                      }}
                       onClick={() => addBlock(block.type as BlockType)}
                       className={cn(
-                        "group flex flex-col items-start gap-1.5 p-2.5 rounded-lg",
+                        "group flex flex-col items-start gap-1.5 p-2.5 rounded-lg cursor-grab active:cursor-grabbing",
                         "border border-white/[0.06] bg-white/[0.02]",
                         "hover:bg-white/[0.05] hover:border-violet-500/30 hover:shadow-[0_0_24px_-8px_rgba(139,92,246,0.4)]",
                         "transition-all text-left"

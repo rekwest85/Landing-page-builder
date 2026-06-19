@@ -22,6 +22,8 @@ interface EditorState {
 
   // Block operations
   addBlock: (type: any, index?: number) => void;
+  addBlockToColumn: (columnBlockId: string, columnIndex: number, type: any) => void;
+  setColumnCount: (id: string, count: 2 | 3 | 4) => void;
   removeBlock: (id: string) => void;
   duplicateBlock: (id: string) => void;
   moveBlock: (id: string, direction: "up" | "down") => void;
@@ -69,6 +71,62 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     if (index == null) blocks.push(newBlock);
     else blocks.splice(index, 0, newBlock);
     set({ blocks, selectedBlockId: newBlock.id, isDirty: true });
+  },
+
+  addBlockToColumn: (columnBlockId, columnIndex, type) => {
+    const blocks = [...get().blocks];
+    const idx = blocks.findIndex((b) => b.id === columnBlockId);
+    if (idx < 0) return;
+    const target = blocks[idx];
+    if (target.type !== "columns") return;
+    const columns: Block[][] = (target.children as unknown as Block[][]) ?? [];
+    const newBlock = createBlock(type);
+    const nextColumns = columns.map((col, i) =>
+      i === columnIndex ? [...(col ?? []), newBlock] : col
+    );
+    blocks[idx] = { ...target, children: nextColumns as unknown as Block[] };
+    set({ blocks, selectedBlockId: newBlock.id, isDirty: true });
+  },
+
+  setColumnCount: (id, count) => {
+    const blocks = [...get().blocks];
+    const idx = blocks.findIndex((b) => b.id === id);
+    if (idx < 0) return;
+    const target = blocks[idx];
+    if (target.type !== "columns") return;
+    const columns: Block[][] = (target.children as unknown as Block[][]) ?? [];
+    let nextColumns: Block[][];
+    if (columns.length < count) {
+      // Grow: add empty columns
+      nextColumns = [...columns, ...Array.from({ length: count - columns.length }, () => [])];
+    } else if (columns.length > count) {
+      // Shrink: drop trailing columns (warn if non-empty)
+      const dropped = columns.slice(count);
+      const droppedCount = dropped.reduce((sum, col) => sum + (col?.length ?? 0), 0);
+      nextColumns = columns.slice(0, count);
+      // Update props to reflect new count
+      blocks[idx] = {
+        ...target,
+        props: { ...target.props, columns: count },
+        children: nextColumns as unknown as Block[],
+      };
+      set({ blocks, isDirty: true });
+      if (droppedCount > 0) {
+        // Could show a toast here — for now, console warn
+        console.warn(
+          `Reduced columns from ${columns.length} to ${count}; discarded ${droppedCount} block(s).`
+        );
+      }
+      return;
+    } else {
+      nextColumns = columns;
+    }
+    blocks[idx] = {
+      ...target,
+      props: { ...target.props, columns: count },
+      children: nextColumns as unknown as Block[],
+    };
+    set({ blocks, isDirty: true });
   },
 
   removeBlock: (id) => {

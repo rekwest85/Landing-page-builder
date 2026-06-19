@@ -9,6 +9,7 @@ import type { Block } from "./types";
 import { cn } from "@/lib/utils";
 import { ArrowRight, Zap, Sparkles, Target, Quote, Star } from "lucide-react";
 import * as React from "react";
+import { useEditorStore } from "@/stores/editor";
 
 // ── Icon resolver (string → component) ───────────────────────────────────────
 
@@ -494,31 +495,169 @@ function ColumnsBlock({ block }: { block: Block }) {
     <div style={styleToCss(block.style)}>
       <div className={cn("max-w-6xl mx-auto grid gap-6", colClass)}>
         {columns.map((column, i) => (
-          <div key={i} className="space-y-4 min-h-[80px]">
-            {column?.length ? (
-              column.map((child) => (
-                <BlockRenderer key={child.id} block={child} />
-              ))
-            ) : (
-              <EmptyColumn />
-            )}
-          </div>
+          <Column
+            key={i}
+            blockId={block.id}
+            columnIndex={i}
+            column={column}
+          />
         ))}
       </div>
     </div>
   );
 }
 
-function EmptyColumn() {
+function Column({
+  blockId,
+  columnIndex,
+  column,
+}: {
+  blockId: string;
+  columnIndex: number;
+  column: Block[];
+}) {
+  const addBlockToColumn = useEditorStore((s) => s.addBlockToColumn);
+  const [isDragOver, setIsDragOver] = React.useState(false);
+  const [pickerOpen, setPickerOpen] = React.useState(false);
+
+  function onDrop(e: React.DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+    const type = e.dataTransfer.getData("application/x-forge-block");
+    if (!type) return;
+    addBlockToColumn(blockId, columnIndex, type);
+  }
+
+  function onDragOver(e: React.DragEvent) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+    setIsDragOver(true);
+  }
+
+  function onDragLeave() {
+    setIsDragOver(false);
+  }
+
+  function onClickEmpty(e: React.MouseEvent) {
+    e.stopPropagation();
+    setPickerOpen((v) => !v);
+  }
+
   return (
-    <div className="flex items-center justify-center h-24 rounded-xl border-2 border-dashed border-[#0a0a0f]/15 bg-[#0a0a0f]/[0.02] text-xs text-[#0a0a0f]/40 hover:border-violet-500/40 hover:bg-violet-500/[0.04] transition-colors cursor-pointer">
+    <div
+      className={cn(
+        "space-y-4 min-h-[80px] rounded-xl transition-all",
+        isDragOver && "ring-2 ring-violet-500 ring-offset-2"
+      )}
+      onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
+      onDrop={onDrop}
+      onClick={(e) => e.stopPropagation()}
+    >
+      {(column?.length ?? 0) > 0 ? (
+        column.map((child) => <BlockRenderer key={child.id} block={child} />)
+      ) : (
+        <EmptyColumn onClick={onClickEmpty} highlighted={isDragOver} />
+      )}
+
+      {pickerOpen && (
+        <ColumnBlockPicker
+          onPick={(type) => {
+            addBlockToColumn(blockId, columnIndex, type);
+            setPickerOpen(false);
+          }}
+          onClose={() => setPickerOpen(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+function EmptyColumn({
+  onClick,
+  highlighted,
+}: {
+  onClick: (e: React.MouseEvent) => void;
+  highlighted?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "w-full flex items-center justify-center h-24 rounded-xl border-2 border-dashed text-xs transition-colors",
+        highlighted
+          ? "border-violet-500 bg-violet-500/[0.06] text-violet-700"
+          : "border-[#0a0a0f]/15 bg-[#0a0a0f]/[0.02] text-[#0a0a0f]/40 hover:border-violet-500/40 hover:bg-violet-500/[0.04]"
+      )}
+    >
       <span className="inline-flex items-center gap-2">
         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
         </svg>
-        Drop or click to add a block
+        Drop a block here, or click to pick one
       </span>
-    </div>
+    </button>
+  );
+}
+
+function ColumnBlockPicker({
+  onPick,
+  onClose,
+}: {
+  onPick: (type: any) => void;
+  onClose: () => void;
+}) {
+  React.useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  // Quick list — most useful blocks for inside a column
+  const choices: { type: any; label: string }[] = [
+    { type: "heading", label: "Heading" },
+    { type: "richtext", label: "Text" },
+    { type: "image", label: "Image" },
+    { type: "features", label: "Features" },
+    { type: "testimonial", label: "Testimonial" },
+    { type: "cta", label: "CTA" },
+    { type: "form", label: "Form" },
+    { type: "stats", label: "Stats" },
+  ];
+
+  return (
+    <>
+      {/* Click-outside backdrop */}
+      <div
+        className="fixed inset-0 z-40"
+        onClick={(e) => {
+          e.stopPropagation();
+          onClose();
+        }}
+      />
+      <div
+        className="relative z-50 mt-2 rounded-xl border border-violet-500/30 bg-white shadow-xl p-2 grid grid-cols-2 gap-1"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {choices.map((c) => (
+          <button
+            key={c.type}
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onPick(c.type);
+            }}
+            className="px-3 py-2 rounded-lg text-left text-xs font-medium text-[#0a0a0f] hover:bg-violet-500/10 hover:text-violet-700 transition-colors"
+          >
+            {c.label}
+          </button>
+        ))}
+      </div>
+    </>
   );
 }
 
