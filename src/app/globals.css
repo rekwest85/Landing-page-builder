@@ -153,3 +153,13 @@ html, body {
   0%   { transform: translateX(-50%); }
   100% { transform: translateX(0); }
 }
+
+/* ── Block style cascade ─────────────────────────────────────────────────────
+   When a block has a custom text color, BlockOutline adds .has-custom-color.
+   The block's outer div sets --forge-color as an inline CSS custom property,
+   which inherits to all descendants. This rule forces every descendant to
+   pick up that color, overriding hardcoded Tailwind text-* classes inside
+   the block components. */
+.has-custom-color * {
+  color: var(--forge-color) !important;
+}

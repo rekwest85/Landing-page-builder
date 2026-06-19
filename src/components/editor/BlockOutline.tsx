@@ -26,7 +26,10 @@ export function BlockOutline({ blocks }: { blocks: Block[] }) {
         return (
           <div
             key={block.id}
-            className="relative group/block"
+            className={cn(
+              "relative group/block",
+              block.style?.color && "has-custom-color"
+            )}
             onMouseEnter={() => setHovered(block.id)}
             onMouseLeave={() => setHovered(null)}
             onClick={(e) => {

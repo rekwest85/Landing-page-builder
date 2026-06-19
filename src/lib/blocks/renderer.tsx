@@ -37,7 +37,7 @@ function Icon({ name, className }: { name?: string; className?: string }) {
 
 function styleToCss(style?: Block["style"]): React.CSSProperties {
   if (!style) return {};
-  return {
+  const css: React.CSSProperties = {
     padding: style.padding,
     margin: style.margin,
     background: style.background,
@@ -45,6 +45,12 @@ function styleToCss(style?: Block["style"]): React.CSSProperties {
     textAlign: style.textAlign,
     maxWidth: style.maxWidth,
   } as React.CSSProperties;
+  // Expose color as a CSS custom property so descendants can pick it up
+  // via the `.has-custom-color * { color: var(--forge-color) }` cascade rule.
+  if (style.color) {
+    (css as Record<string, string>)["--forge-color"] = style.color;
+  }
+  return css;
 }
 
 // ── Block components ─────────────────────────────────────────────────────────

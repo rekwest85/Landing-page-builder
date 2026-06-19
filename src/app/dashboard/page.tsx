@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Plus, Rocket, Trash2, ExternalLink, Globe } from "lucide-react";
+import { Plus, Rocket, ExternalLink, Globe } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
+import { DeletePageButton } from "@/components/dashboard/DeletePageButton";
 
 export default async function DashboardPage() {
   const dbAvailable = prisma !== null;
@@ -130,40 +131,48 @@ export default async function DashboardPage() {
         ) : (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {pages.map((page) => (
-              <Link
+              <div
                 key={page.id}
-                href={`/editor/${page.id}`}
-                className="group block rounded-2xl border border-white/[0.08] bg-white/[0.02] p-5 hover:bg-white/[0.04] hover:border-violet-500/30 transition-all"
+                className="group relative rounded-2xl border border-white/[0.08] bg-white/[0.02] p-5 hover:bg-white/[0.04] hover:border-violet-500/30 transition-all"
               >
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium text-white truncate">
-                      {page.title || "Untitled"}
+                <Link
+                  href={`/editor/${page.id}`}
+                  className="block"
+                >
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium text-white truncate">
+                        {page.title || "Untitled"}
+                      </div>
+                      <div className="text-xs text-white/40 mt-0.5 truncate">
+                        /{page.slug}
+                      </div>
                     </div>
-                    <div className="text-xs text-white/40 mt-0.5 truncate">
-                      /{page.slug}
-                    </div>
+                    <span
+                      className={
+                        page.status === "PUBLISHED"
+                          ? "inline-flex items-center gap-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 text-[10px] font-medium text-emerald-300"
+                          : "inline-flex items-center gap-1 rounded-full bg-white/[0.04] border border-white/[0.08] px-2 py-0.5 text-[10px] font-medium text-white/50"
+                      }
+                    >
+                      <span className={`h-1.5 w-1.5 rounded-full ${page.status === "PUBLISHED" ? "bg-emerald-400" : "bg-white/40"}`} />
+                      {page.status.toLowerCase()}
+                    </span>
                   </div>
-                  <span
-                    className={
-                      page.status === "PUBLISHED"
-                        ? "inline-flex items-center gap-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 text-[10px] font-medium text-emerald-300"
-                        : "inline-flex items-center gap-1 rounded-full bg-white/[0.04] border border-white/[0.08] px-2 py-0.5 text-[10px] font-medium text-white/50"
-                    }
-                  >
-                    <span className={`h-1.5 w-1.5 rounded-full ${page.status === "PUBLISHED" ? "bg-emerald-400" : "bg-white/40"}`} />
-                    {page.status.toLowerCase()}
-                  </span>
+                  <div className="aspect-[16/9] rounded-lg bg-white/[0.04] border border-white/[0.06] mb-3 overflow-hidden flex items-center justify-center text-[10px] text-white/30">
+                    {Array.isArray(page.tree) && page.tree.length > 0
+                      ? `${(page.tree as any[]).length} blocks`
+                      : "Empty"}
+                  </div>
+                  <div className="text-xs text-white/40">
+                    Updated {new Date(page.updatedAt).toLocaleDateString()}
+                  </div>
+                </Link>
+                {/* Delete button — floats at bottom-right, shows on hover */}
+                <div className="absolute bottom-3 right-3 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <DeletePageButton pageId={page.id} title={page.title || "Untitled"} />
                 </div>
-                <div className="aspect-[16/9] rounded-lg bg-white/[0.04] border border-white/[0.06] mb-3 overflow-hidden flex items-center justify-center text-[10px] text-white/30">
-                  {Array.isArray(page.tree) && page.tree.length > 0
-                    ? `${(page.tree as any[]).length} blocks`
-                    : "Empty"}
-                </div>
-                <div className="text-xs text-white/40">
-                  Updated {new Date(page.updatedAt).toLocaleDateString()}
-                </div>
-              </Link>
+              </div>
             ))}
           </div>
         )}
