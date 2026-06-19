@@ -1,6 +1,11 @@
 // AI generation for Forge.
 // Calls any OpenAI-compatible chat completions API.
-// Defaults to whatever OPENAI_API_KEY points at; can be swapped for Anthropic, DeepSeek, Kimi, etc.
+// Configured for DeepSeek V4 Flash by default — set OPENAI_* env vars to override.
+//
+// Env vars:
+//   OPENAI_API_KEY    required (DeepSeek key works)
+//   OPENAI_BASE_URL   defaults to DeepSeek's API
+//   OPENAI_MODEL      defaults to deepseek-chat (alias for deepseek-v4-flash)
 
 export interface AIMessage {
   role: "system" | "user" | "assistant";
@@ -14,8 +19,8 @@ export interface AICompletionOptions {
   maxTokens?: number;
 }
 
-const DEFAULT_BASE_URL = "https://api.openai.com/v1";
-const DEFAULT_MODEL = "gpt-4o-mini";
+const DEFAULT_BASE_URL = "https://api.deepseek.com/v1";
+const DEFAULT_MODEL = "deepseek-chat"; // DeepSeek's alias for deepseek-v4-flash
 
 export async function generateCompletion({
   messages,
@@ -26,7 +31,7 @@ export async function generateCompletion({
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     throw new Error(
-      "OPENAI_API_KEY not set. Add it to .env to enable AI generation."
+      "OPENAI_API_KEY not set. Add it to Vercel env vars to enable AI generation."
     );
   }
 
