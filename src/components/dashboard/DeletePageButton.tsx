@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Trash2, Loader2 } from "lucide-react";
+import { Trash2, Loader2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -16,86 +16,75 @@ export function DeletePageButton({
   className?: string;
 }) {
   const router = useRouter();
-  const [confirming, setConfirming] = React.useState(false);
-  const [deleting, setDeleting] = React.useState(false);
-  const inputRef = React.useRef<HTMLInputElement>(null);
+  const [stage, setStage] = React.useState<"idle" | "confirm" | "deleting">("idle");
 
-  // Auto-focus the input when the confirm step appears
+  // Reset after 4s of inactivity in the confirm stage (prevents accidental clicks later)
   React.useEffect(() => {
-    if (confirming) inputRef.current?.focus();
-  }, [confirming]);
+    if (stage !== "confirm") return;
+    const t = setTimeout(() => setStage("idle"), 4000);
+    return () => clearTimeout(t);
+  }, [stage]);
 
-  // Close confirmation on escape
+  // Close on escape
   React.useEffect(() => {
-    if (!confirming) return;
+    if (stage !== "confirm") return;
     function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") setConfirming(false);
+      if (e.key === "Escape") setStage("idle");
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [confirming]);
+  }, [stage]);
 
   async function handleDelete() {
-    if (!inputRef.current) return;
-    if (inputRef.current.value.trim() !== title) {
-      toast.error("Type the page title exactly to confirm");
-      return;
-    }
-    setDeleting(true);
+    setStage("deleting");
     try {
       const res = await fetch(`/api/pages/${pageId}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("Delete failed");
-      toast.success("Page deleted");
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error ?? `Delete failed (HTTP ${res.status})`);
+      }
+      toast.success(`Deleted "${title}"`);
+      setStage("idle");
       router.refresh();
-      setConfirming(false);
     } catch (err: any) {
       toast.error(err.message ?? "Failed to delete page");
-    } finally {
-      setDeleting(false);
+      setStage("confirm");
     }
   }
 
-  if (confirming) {
+  if (stage === "confirm" || stage === "deleting") {
     return (
       <div
         className={cn(
-          "flex flex-col gap-2 p-3 rounded-xl border border-red-500/30 bg-red-500/[0.06]",
+          "flex flex-col gap-1.5 p-2 rounded-lg border border-red-500/30 bg-red-500/[0.06] backdrop-blur-sm shadow-lg",
           className
         )}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="text-[11px] text-red-200 leading-snug">
-          Type <span className="font-semibold text-white">{title}</span> to confirm deletion. This permanently removes the page and all its versions.
+        <div className="flex items-center gap-1.5 text-[10px] text-red-200 leading-snug">
+          <AlertTriangle className="h-3 w-3 shrink-0" />
+          <span>Delete this page permanently?</span>
         </div>
-        <input
-          ref={inputRef}
-          type="text"
-          placeholder={title}
-          className="w-full h-7 px-2 rounded-md bg-black/40 border border-red-500/30 text-xs text-white placeholder:text-white/30 focus:outline-none focus:border-red-400/60"
-          onKeyDown={(e) => {
-            if (e.key === "Enter") handleDelete();
-          }}
-        />
         <div className="flex items-center gap-1.5">
           <button
             onClick={handleDelete}
-            disabled={deleting}
+            disabled={stage === "deleting"}
             className="flex-1 inline-flex items-center justify-center gap-1.5 h-7 rounded-md bg-red-500 hover:bg-red-400 disabled:opacity-50 text-white text-[11px] font-medium transition-colors"
           >
-            {deleting ? (
+            {stage === "deleting" ? (
               <Loader2 className="h-3 w-3 animate-spin" />
             ) : (
               <Trash2 className="h-3 w-3" />
             )}
-            Delete page
+            Yes, delete
           </button>
           <button
             onClick={(e) => {
               e.stopPropagation();
-              setConfirming(false);
+              setStage("idle");
             }}
-            disabled={deleting}
-            className="h-7 px-3 rounded-md bg-white/[0.04] hover:bg-white/[0.08] text-white/70 hover:text-white text-[11px] font-medium transition-colors"
+            disabled={stage === "deleting"}
+            className="h-7 px-2.5 rounded-md bg-white/[0.04] hover:bg-white/[0.08] text-white/70 hover:text-white text-[11px] font-medium transition-colors"
           >
             Cancel
           </button>
@@ -109,7 +98,7 @@ export function DeletePageButton({
       onClick={(e) => {
         e.preventDefault();
         e.stopPropagation();
-        setConfirming(true);
+        setStage("confirm");
       }}
       className={cn(
         "inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md",
