@@ -1,7 +1,12 @@
+"use client";
+
 // The Block Renderer
-// Server component. Used for:
+// Used for:
 //   1. Published pages (/p/[slug] or [subdomain]/[slug])
 //   2. Live editor preview (wrapped by the editor)
+//
+// Marked "use client" because many block components use hooks
+// (useState/useEffect/useRef) for animations and interactivity.
 //
 // Each block is rendered with semantic HTML, accessibility, and beautiful defaults.
 
